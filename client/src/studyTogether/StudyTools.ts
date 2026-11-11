@@ -108,6 +108,7 @@ function libraryTools(): HTMLElement {
 function questionBoard(map: string, off: (() => void)[]): HTMLElement {
   const list = h('div', { class: 'study-questions' }, h('p', {}, 'Loading questions…'));
   const status = h('p', { class: 'study-board-status', attrs: { role: 'status' } });
+  const focusHint = h('p', { attrs: { role: 'status', hidden: true } }, 'You can read the board while focusing. Board actions resume when focus ends.');
   const input = h('textarea', { class: 'input', attrs: { maxlength: QUESTION_LIMIT, rows: 2, required: true, id: 'study-board-input' } });
   const label = h('label', { attrs: { for: input.id } }, 'Ask a question');
   const submit = h('button', { class: 'btn btn-small', attrs: { type: 'submit' } }, 'Post question');
@@ -127,20 +128,21 @@ function questionBoard(map: string, off: (() => void)[]): HTMLElement {
     class: 'study-board-form',
     on: { submit: (event) => {
       event.preventDefault();
-      if (!input.value.trim()) return;
-      if (pendingText !== null) return;
+      if (app.timer.state.phase === 'focus' || !input.value.trim() || pendingText !== null) return;
       pendingText = input.value;
+      submit.disabled = true;
+      status.textContent = 'Posting…';
       app.net.sendBoardAction(replyTo
         ? { kind: 'answer', questionId: replyTo.id, text: input.value }
         : { kind: 'ask', text: input.value });
     } },
   }, label, input, h('div', { class: 'row' }, submit, cancelReply));
 
-  const readOnly = (): void => {
+  const controls = h('fieldset', { class: 'study-board-controls', attrs: { 'aria-label': 'Question board actions' } }, list, form);
+  const updateFocus = (): void => {
     const focusing = app.timer.state.phase === 'focus';
-    input.disabled = focusing;
-    submit.disabled = focusing;
-    status.textContent = focusing ? 'Posting is paused while you focus.' : '';
+    controls.disabled = focusing;
+    focusHint.hidden = !focusing;
   };
   const render = (): void => {
     const hidden = new Set(app.net.players().filter((player) => player.muted || player.blocked).map((player) => player.id));
@@ -168,23 +170,25 @@ function questionBoard(map: string, off: (() => void)[]): HTMLElement {
       if (snapshot.posted) {
         if (input.value === pendingText) input.value = '';
         pendingText = null;
+        submit.disabled = false;
+        status.textContent = 'Posted.';
         choose(null);
       }
-      readOnly();
       if (snapshot.notice) {
         pendingText = null;
+        submit.disabled = false;
         status.textContent = snapshot.notice;
       }
       render();
     }),
-    app.timer.changed.subscribe(readOnly),
+    app.timer.changed.subscribe(updateFocus),
     app.net.changed.subscribe(() => {
       if (app.net.online) render();
     }),
   );
-  readOnly();
+  updateFocus();
   app.net.sendBoardAction({ kind: 'read' });
-  return h('section', { class: 'study-section' }, h('h3', {}, 'Question board'), list, form, status);
+  return h('section', { class: 'study-section' }, h('h3', {}, 'Question board'), focusHint, controls, status);
 }
 
 function postAction(question: BoardQuestion, post: BoardPost): HTMLButtonElement {
