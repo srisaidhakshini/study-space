@@ -7,6 +7,7 @@ export * from './collision';
 export * from './pathfinding';
 export * from './mapSchema';
 export * from './timer';
+export * from './studyTogether';
 export * from './tiledMap';
 export * from './protocol';
 export * from './accounts';

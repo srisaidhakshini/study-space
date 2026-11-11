@@ -5,6 +5,7 @@ import {
   parseMapObjects,
   TILE,
   TILE_PROP_SORT_OFFSET,
+  TREE_PLOT,
   type CollisionGrid,
   type MapEntry,
   type MapObjects,
@@ -20,12 +21,14 @@ export interface LoadedMap {
   heightPx: number;
   grid: CollisionGrid;
   objects: MapObjects;
+  treeTiles: Phaser.GameObjects.Image[];
 }
 
 /** Turns every furniture tile into its own image so it can depth-sort with characters. */
-function buildFurniture(scene: Phaser.Scene, map: Phaser.Tilemaps.Tilemap, entry: MapEntry): void {
+function buildFurniture(scene: Phaser.Scene, map: Phaser.Tilemaps.Tilemap, entry: MapEntry, id: string): Phaser.GameObjects.Image[] {
+  const treeTiles: Phaser.GameObjects.Image[] = [];
   const layer = map.getLayer(LAYERS.furniture);
-  if (!layer) return;
+  if (!layer) return treeTiles;
   for (const row of layer.data) {
     for (const tile of row) {
       if (!tile || tile.index <= 0) continue;
@@ -35,12 +38,17 @@ function buildFurniture(scene: Phaser.Scene, map: Phaser.Tilemaps.Tilemap, entry
       if (!texture) continue;
       const props = tileset.getTileProperties(tile.index) as Record<string, unknown> | null | undefined;
       const sortOffset = Number(props?.[TILE_PROP_SORT_OFFSET] ?? 0) || 0;
-      scene.add
+      const image = scene.add
         .image(tile.x * TILE, tile.y * TILE, texture, tile.index - tileset.firstgid)
         .setOrigin(0, 0)
         .setDepth((tile.y + 1 + sortOffset) * TILE);
+      const { x, y, size } = TREE_PLOT;
+      if (id === 'garden' && tile.x >= x && tile.x < x + size && tile.y >= y && tile.y < y + size) {
+        treeTiles.push(image);
+      }
     }
   }
+  return treeTiles;
 }
 
 function buildGrid(map: Phaser.Tilemaps.Tilemap): CollisionGrid {
@@ -79,7 +87,7 @@ export function loadMap(scene: Phaser.Scene, id: string): LoadedMap {
     if (map.getLayerIndex(name) === null) continue;
     map.createLayer(name, tilesets, 0, 0)?.setDepth(depth);
   }
-  buildFurniture(scene, map, entry);
+  const treeTiles = buildFurniture(scene, map, entry, id);
 
   const raw = (map.getObjectLayer(LAYERS.objects)?.objects ?? []) as unknown as RawTiledObject[];
   const widthPx = map.widthInPixels;
@@ -94,7 +102,7 @@ export function loadMap(scene: Phaser.Scene, id: string): LoadedMap {
       .setDepth(DEPTH.ambient);
   }
 
-  return { id, entry, widthPx, heightPx, grid: buildGrid(map), objects: parseMapObjects(raw) };
+  return { id, entry, widthPx, heightPx, grid: buildGrid(map), objects: parseMapObjects(raw), treeTiles };
 }
 
 /**

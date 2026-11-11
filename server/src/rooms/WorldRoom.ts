@@ -13,6 +13,7 @@ import {
   S2C,
   SERVER_TICK_MS,
   SIT_RANGE,
+  STUDY_TOGETHER,
   TILE,
   advanceTimer,
   feetBlocked,
@@ -42,6 +43,8 @@ import { loadStatsMessage, recordServerSession } from '../db/stats';
 import { addReport } from '../moderation/reports';
 import { enqueue, retryOnce } from './persist';
 import { Player, WorldState } from '../schema/PlayerState';
+import { QuestionBoards } from '../studyTogether/QuestionBoards';
+import { sharedTree } from '../studyTogether/tree';
 import { getWorld, type ServerMap } from '../world/maps';
 import { sendChat } from './chat';
 import { checkMove, parseMove } from './movement';
@@ -70,6 +73,8 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
   private readonly sessions = new Map<string, PlayerSession>();
+  private readonly boards = new QuestionBoards(this.sessions, () => ({ server: this.serverName, roomId: this.roomId }));
+  private lastTreeMinutes = -1;
   private readonly voice = new VoiceHub(this.sessions);
   /** Camera sharing between people sitting at study seats. */
   private readonly video = new VoiceHub(this.sessions, VIDEO_CHANNEL);
@@ -104,6 +109,8 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.onMessage(C2S.videoJoin, (c) => this.withSession(c, (s) => this.video.join(s)));
     this.onMessage(C2S.videoLeave, (c) => this.video.leave(c.sessionId));
     this.onMessage(C2S.videoSignal, (c, m) => this.withSession(c, (s) => this.video.signal(s, m, Date.now())));
+
+    this.onMessage(STUDY_TOGETHER.boardAction, (c, m) => this.withSession(c, (s) => this.boards.handle(s, m, serverConfig.now())));
 
     this.clock.setInterval(() => this.tick(), SERVER_TICK_MS);
   }
@@ -182,6 +189,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       dir: spawn.facing,
     };
     client.send(S2C.welcome, welcome);
+    client.send(STUDY_TOGETHER.tree, sharedTree().minutes);
   }
 
   onLeave(client: Client): void {
@@ -367,6 +375,12 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     });
   }
 
+  private contributeToTree(s: PlayerSession, records: readonly SessionRecord[]): void {
+    if (s.player.map === 'garden' && records.length > 0) {
+      sharedTree().add(records.reduce((sum, record) => sum + record.minutes, 0));
+    }
+  }
+
   /** Ends the running timer now, crediting the whole minutes of focus done. */
   private endTimer(s: PlayerSession, now: number): void {
     if (s.timer.phase === 'idle') return;
@@ -378,6 +392,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     if (record) {
       countRecords(s, [record], now);
       s.client.send(S2C.session, { record });
+      this.contributeToTree(s, [record]);
       this.persist(s, [record]);
     }
     s.player.anim = deriveAnim(s, now);
@@ -392,6 +407,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     writeTimer(s.player, s.timer);
     countRecords(s, step.records, now);
     for (const record of step.records) s.client.send(S2C.session, { record });
+    this.contributeToTree(s, step.records);
     this.persist(s, step.records);
     for (const event of step.events) {
       s.client.send(S2C.timerEvent, { event });
@@ -405,6 +421,11 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
 
   private tick(): void {
     const now = serverConfig.now();
+    const treeMinutes = sharedTree().minutes;
+    if (treeMinutes !== this.lastTreeMinutes) {
+      this.lastTreeMinutes = treeMinutes;
+      this.broadcast(STUDY_TOGETHER.tree, treeMinutes);
+    }
     for (const s of this.sessions.values()) {
       rollDay(s, now);
       this.advance(s, now);
@@ -473,6 +494,9 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       if (!isPlainObject(raw) || typeof raw.targetId !== 'string' || raw.targetId === s.id) return;
       if (!block) s.blocked.delete(raw.targetId);
       else if (s.blocked.size < MAX_BLOCKED) s.blocked.add(raw.targetId);
+      this.boards.send(s);
+      const target = this.sessions.get(raw.targetId);
+      if (target) this.boards.send(target);
     });
   }
 }

@@ -1,4 +1,4 @@
-import { TILE } from '@study/shared';
+import { TILE, TREE_PLOT } from '@study/shared';
 import { makeRng } from '../png';
 import { FLOWER_COLOURS } from '../tiles/gardenTiles';
 import type { Tileset } from '../tiles/tileset';
@@ -17,7 +17,6 @@ const CY = 12.5;
 const ringDist = (x: number, y: number): number => Math.hypot(x + 0.5 - CX, y + 0.5 - CY);
 const inBed = (x: number, y: number): boolean => ringDist(x, y) <= 2.9;
 const inRing = (x: number, y: number): boolean => ringDist(x, y) <= 5.6;
-const TREE = { x: 15, y: 7 };
 
 // The pond in the north-west, with a line of stepping stones across it.
 const inPond = (x: number, y: number): boolean =>
@@ -88,8 +87,8 @@ export function buildGarden(town: Tileset): MapBuilder {
   layout.take(19, 24, 1, 2, 'gate pillar');
 
   // The shared tree, its bed, and the zone around it.
-  m.block('furniture', TREE.x, TREE.y, 'garden_tree', 6, 6);
-  layout.take(TREE.x, TREE.y, 6, 6, 'shared tree');
+  m.block('furniture', TREE_PLOT.x, TREE_PLOT.y, 'garden_tree', TREE_PLOT.size, TREE_PLOT.size);
+  layout.take(TREE_PLOT.x, TREE_PLOT.y, TREE_PLOT.size, TREE_PLOT.size, 'shared tree');
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       if (inBed(x, y) && !layout.isTaken(x, y)) {

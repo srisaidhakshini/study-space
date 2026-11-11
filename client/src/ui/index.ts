@@ -1,3 +1,4 @@
+import { createStudyTools } from '../studyTogether/StudyTools';
 import { openAccountPanel } from './AccountPanel';
 import { createChat } from './Chat';
 import { openCreator } from './Creator';
@@ -42,6 +43,7 @@ export function mountUi(root: HTMLElement): UiHandle {
     });
 
   const hud = createHud({
+    studyTools: createStudyTools(root),
     openAccount: () => openAccountPanel(root),
     openStats: () => openStatsPanel(root),
     openCreator: () => openCreator(root),

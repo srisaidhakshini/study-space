@@ -13,6 +13,7 @@ import {
 } from '@study/shared';
 import { app } from '../../app';
 import { bus } from '../../bus';
+import { StudyWorld } from '../../studyTogether/StudyWorld';
 import { Character } from '../character/Character';
 import { Pet } from '../character/Pet';
 import { DEPTH, SCENES } from '../depths';
@@ -55,6 +56,7 @@ export class WorldScene extends Phaser.Scene {
   private target: WorldInit = { map: '', spawn: '' };
   private map!: LoadedMap;
   private seats!: Seats;
+  private studyWorld!: StudyWorld;
   private lamps!: Lamps;
   /** Day, night, weather and street lamps; outdoor maps only. */
   private sky: Sky | null = null;
@@ -109,6 +111,7 @@ export class WorldScene extends Phaser.Scene {
     if (!this.scene.isActive(SCENES.overlay)) this.scene.launch(SCENES.overlay);
     this.overlay = this.scene.get(SCENES.overlay) as OverlayScene;
     this.overlay.track(this.player);
+    this.studyWorld = new StudyWorld(this, this.map, this.seats);
     this.remotes = new RemotePlayers(this, this.overlay, this.seats, this.map.id);
     if (!this.map.entry.indoor) {
       this.sky = new Sky(this, this.map.widthPx, this.map.heightPx, this.map.objects.lights, () => this.overlay);
@@ -159,6 +162,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.update(dt);
     this.pet?.update(dt, this.player.x, this.player.y);
     this.remotes.update(dt);
+    if (!this.travelling) this.studyWorld.update(dt);
     this.sky?.update(dt);
     this.sendMove(dt);
 
@@ -311,6 +315,7 @@ export class WorldScene extends Phaser.Scene {
     this.remotes.destroy();
     this.sky?.destroy();
     this.sky = null;
+    this.studyWorld.destroy();
     this.overlay.clear();
     this.pet = null;
     this.petId = '';

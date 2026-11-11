@@ -7,6 +7,7 @@ import { coinIcon } from './pixelIcon';
 import { speakerIcon } from './speakerIcon';
 
 export interface HudActions {
+  studyTools: HTMLElement;
   openAccount(): void;
   openStats(): void;
   openCreator(): void;
@@ -231,6 +232,7 @@ export function createHud(actions: HudActions): HTMLElement {
         voiceGroup,
         drinkBtn,
         peopleBtn,
+        actions.studyTools,
         button('Servers', 'btn btn-small', actions.openServers, { title: 'Choose a server' }),
         button('Wave', 'btn btn-small', () => bus.emit('ui:emote', { name: 'wave' }), { title: 'Wave hello' }),
         button('Character', 'btn btn-small', actions.openCreator, { title: 'Edit your character' }),

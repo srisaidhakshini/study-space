@@ -111,6 +111,11 @@ export class Character {
     this.play();
   }
 
+  setOpacity(alpha: number): void {
+    this.sprite.setAlpha(alpha);
+    this.shadow.setAlpha(alpha);
+  }
+
   setAppearance(appearance: Appearance): void {
     this.texture = ensureCharacterTexture(this.scene, appearance);
     this.play(true);
