@@ -3,11 +3,12 @@
 A cozy pixel-art world for studying together: walk around as a chibi
 character, sit at a desk, and run a focus timer that floats above your head.
 
-**Status: phase 4 of 7** — multiplayer (Colyseus server, synced movement,
-server-side timers, chat rules), nine places with their own ambience and
-lo-fi music, a day/night cycle with weather, and accounts: sign up to keep
-your look, study history, streaks and focus coins (Postgres via Prisma).
-Homes and the shop, the shared tree growth, buddy desks and polish come next.
+**Status: phases 1–4 of 7, plus voice and video** — multiplayer (Colyseus
+server, synced movement, server-side timers, chat rules), nine places with
+their own ambience and lo-fi music, a day/night cycle with weather, accounts
+(Postgres via Prisma: look, history, streaks and focus coins), WebRTC voice
+calls and study-desk video, and a one-host deployment path. Homes and the shop,
+the shared tree growth, buddy desks and final polish come next.
 
 ## Run it
 
