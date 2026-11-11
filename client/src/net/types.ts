@@ -1,5 +1,6 @@
 import type { ChatDenyReason, Direction, ServerListEntry, WelcomeMessage } from '@study/shared';
 import type { Emitter } from '../state/emitter';
+import type { VideoApi } from '../voice/VideoClient';
 import type { VoiceApi } from '../voice/types';
 
 /**
@@ -30,6 +31,8 @@ export interface NetApi {
   readonly welcome: WelcomeMessage | null;
   /** Voice call with the others in the room. */
   readonly voice: VoiceApi;
+  /** Camera sharing for people seated at study desks. */
+  readonly video: VideoApi;
 
   /** Lists the named servers with live player counts. Throws a readable Error on failure. */
   fetchServers(): Promise<ServerListEntry[]>;

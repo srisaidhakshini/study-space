@@ -37,12 +37,49 @@ function parseSignal(raw: unknown): { to: string; data: VoiceSignalData } | null
  * Whoever joins is told who is already in the call and sends each of them an
  * offer, so the two ends never both offer at once.
  */
+export interface HubChannel {
+  /** S2C message names for this hub. */
+  peers: string;
+  joined: string;
+  left: string;
+  signal: string;
+  /** Who may join, and the notice for everyone else. Defaults to anyone. */
+  canJoin?: (who: PlayerSession) => boolean;
+  denied?: string;
+  /** Whether two members may be linked at all (besides not blocking each other). Defaults to yes. */
+  together?: (a: PlayerSession, b: PlayerSession) => boolean;
+  /** Noun for the "call is full" notice. */
+  label?: string;
+}
+
+export const VOICE_CHANNEL: HubChannel = {
+  peers: S2C.voicePeers,
+  joined: S2C.voicePeerJoined,
+  left: S2C.voicePeerLeft,
+  signal: S2C.voiceSignal,
+};
+
+/** Video is only for people sitting at a study seat, and only between people in the same place. */
+export const VIDEO_CHANNEL: HubChannel = {
+  peers: S2C.videoPeers,
+  joined: S2C.videoPeerJoined,
+  left: S2C.videoPeerLeft,
+  signal: S2C.videoSignal,
+  canJoin: (who) => who.seatKey !== null,
+  denied: 'Sit down at a study desk to start your camera.',
+  together: (a, b) => a.player.map === b.player.map,
+  label: 'video room',
+};
+
 export class VoiceHub {
   private readonly members = new Set<string>();
   /** Per-member signaling allowance: {tokens, last refill time}. */
   private readonly buckets = new Map<string, { tokens: number; at: number }>();
 
-  constructor(private readonly sessions: ReadonlyMap<string, PlayerSession>) {}
+  constructor(
+    private readonly sessions: ReadonlyMap<string, PlayerSession>,
+    private readonly channel: HubChannel = VOICE_CHANNEL,
+  ) {}
 
   has(id: string): boolean {
     return this.members.has(id);
@@ -50,8 +87,13 @@ export class VoiceHub {
 
   join(who: PlayerSession): void {
     if (this.members.has(who.id)) return;
+    if (this.channel.canJoin && !this.channel.canJoin(who)) {
+      const notice: NoticeMessage = { text: this.channel.denied ?? 'You cannot join this call.' };
+      who.client.send(S2C.notice, notice);
+      return;
+    }
     if (this.members.size >= VOICE_MAX_PEERS) {
-      const notice: NoticeMessage = { text: `The voice call is full (${VOICE_MAX_PEERS} people).` };
+      const notice: NoticeMessage = { text: `The ${this.channel.label ?? 'voice call'} is full (${VOICE_MAX_PEERS} people).` };
       who.client.send(S2C.notice, notice);
       return;
     }
@@ -62,20 +104,21 @@ export class VoiceHub {
     }
     this.members.add(who.id);
     const peers: VoicePeersMessage = { ids: existing };
-    who.client.send(S2C.voicePeers, peers);
+    who.client.send(this.channel.peers, peers);
     const joined: VoicePeerMessage = { id: who.id };
-    for (const id of existing) this.sessions.get(id)?.client.send(S2C.voicePeerJoined, joined);
+    for (const id of existing) this.sessions.get(id)?.client.send(this.channel.joined, joined);
   }
 
   leave(id: string): void {
     if (!this.members.delete(id)) return;
     this.buckets.delete(id);
     const left: VoicePeerMessage = { id };
-    for (const other of this.members) this.sessions.get(other)?.client.send(S2C.voicePeerLeft, left);
+    for (const other of this.members) this.sessions.get(other)?.client.send(this.channel.left, left);
   }
 
-  /** The two players are blocking each other (either way), so they get no link. */
+  /** The two players may not be linked: they block each other (either way) or the channel keeps them apart. */
   private apart(a: PlayerSession, b: PlayerSession): boolean {
+    if (this.channel.together && !this.channel.together(a, b)) return true;
     return a.blocked.has(b.id) || b.blocked.has(a.id);
   }
 
@@ -96,6 +139,6 @@ export class VoiceHub {
     const target = this.sessions.get(message.to);
     if (!target || this.apart(from, target)) return;
     const out: VoiceSignalOut = { from: from.id, data: message.data };
-    target.client.send(S2C.voiceSignal, out);
+    target.client.send(this.channel.signal, out);
   }
 }

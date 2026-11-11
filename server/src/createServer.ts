@@ -5,7 +5,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MAX_PLAYERS_PER_ROOM, ROOM_NAME, type ApiError } from '@study/shared';
+import { MAX_PLAYERS_PER_ROOM, ROOM_NAME, SIGNAL_MAX_PAYLOAD, type ApiError } from '@study/shared';
 import { registerAccountRoutes } from './api/accountRoutes';
 import { registerRoutes } from './api/routes';
 import { assertAuthConfig, isProductionEnv, serverConfig } from './config';
@@ -38,7 +38,7 @@ export function createServer(settings: ServerSettings = {}): GameServer {
   getWorld(); // fail fast, with a readable message, if the assets are missing
 
   const server = new Server({
-    transport: new WebSocketTransport(),
+    transport: new WebSocketTransport({ maxPayload: SIGNAL_MAX_PAYLOAD }),
     gracefullyShutdown: false,
     greet: false,
     express: (app) => {

@@ -10,6 +10,7 @@ import { openStatsPanel } from './StatsPanel';
 import { openDrinkMenu } from './DrinkMenu';
 import { openTimerPanel } from './TimerPanel';
 import { createToasts } from './Toasts';
+import { createVideoDock } from './VideoDock';
 
 export interface ServerListOpenOptions {
   /** Shown at the top of the screen, e.g. "Connection lost". */
@@ -50,7 +51,7 @@ export function mountUi(root: HTMLElement): UiHandle {
     openServers: () => showServerList(),
     openPlayers: () => openPlayers(root),
   });
-  root.append(hud, createChat(), h('div', { class: 'toast-layer' }, createToasts()));
+  root.append(hud, createVideoDock(), createChat(), h('div', { class: 'toast-layer' }, createToasts()));
   return {
     openCreator: (onDone) => openCreator(root, onDone),
     openServerList(onEntered, options = {}): void {
