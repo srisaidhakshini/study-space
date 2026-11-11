@@ -1,0 +1,67 @@
+// Study Space database. See docs/ACCOUNTS.md.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  /// Always stored lowercased and trimmed.
+  email        String   @unique
+  /// "scrypt$<salt hex>$<hash hex>"
+  passwordHash String
+  name         String
+  /// JSON of an Appearance, or null until the player saves one.
+  appearanceJson Json?
+  pet          String   @default("")
+  /// Always equal to the sum of this user's CoinTransaction rows.
+  coins        Int      @default(0)
+  tzOffsetMin  Int      @default(0)
+  createdAt    DateTime @default(now())
+  lastLoginAt  DateTime @default(now())
+
+  sessions     StudySession[]
+  transactions CoinTransaction[]
+}
+
+model StudySession {
+  id        String   @id @default(cuid())
+  userId    String
+  subject   String
+  /// "pomodoro" or "stopwatch"
+  mode      String
+  startedAt DateTime
+  endedAt   DateTime
+  minutes   Int
+  completed Boolean
+  /// "server" (recorded by the room's timer) or "import" (history from a guest device)
+  source    String   @default("server")
+  createdAt DateTime @default(now())
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions CoinTransaction[]
+
+  /// A retried or re-imported session can never count twice.
+  @@unique([userId, startedAt])
+  @@index([userId, endedAt])
+}
+
+/// Append-only ledger of coin changes.
+model CoinTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  reason    String
+  sessionId String?
+  createdAt DateTime @default(now())
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session StudySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
