@@ -17,6 +17,9 @@ for (const [id, entry] of Object.entries(manifest.maps)) {
   maps.set(id, parseTiledMap(JSON.parse(readFileSync(join(ASSETS, entry.path), 'utf8'))));
 }
 
+/** Door ids whose target is decided at runtime (house doors, street gates, a home's exit). */
+const DYNAMIC_DOORS = /^(exit|west|east|house-\d+)$/;
+
 const problems: string[] = [];
 const fail = (message: string): number => problems.push(message);
 
@@ -32,6 +35,8 @@ for (const [id, map] of maps) {
     if (!standable(spawn.x, spawn.y)) fail(`${id}: spawn "${spawn.id}" is inside a wall`);
   }
   for (const door of objects.doors) {
+    // Doors of homes and the street depend on the player's house and street page; the server resolves them.
+    if (DYNAMIC_DOORS.test(door.id)) continue;
     const target = maps.get(door.targetMap);
     if (!target) fail(`${id}: door "${door.id}" targets unknown map "${door.targetMap}"`);
     else if (!target.objects.spawns.some((s) => s.id === door.targetSpawn)) {

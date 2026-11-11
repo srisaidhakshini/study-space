@@ -3,7 +3,7 @@ import { h } from './dom';
 const INK = '#2a1b2e';
 
 /** Draws character rows as a pixel-art canvas with a one-pixel dark outline. */
-function draw(rows: string[], legend: Record<string, string>, scale: number, label: string): HTMLCanvasElement {
+export function draw(rows: string[], legend: Record<string, string>, scale: number, label: string): HTMLCanvasElement {
   const w = rows[0]!.length;
   const rowsCount = rows.length;
   const canvas = h('canvas', {
@@ -41,5 +41,45 @@ export function flameIcon(scale = 2): HTMLCanvasElement {
     { r: '#d9765a', o: '#eda67a', y: '#f0c552' },
     scale,
     'Streak',
+  );
+}
+
+/** A little house, for homes. */
+export function houseIcon(scale = 2): HTMLCanvasElement {
+  return draw(
+    ['...rr...', '..rrrr..', '.rrrrrr.', 'rrrrrrrr', '.wwwwww.', '.wwbbww.', '.wwbbww.', '.wwbbww.'],
+    { r: '#d9765a', w: '#f5e3b5', b: '#96694f' },
+    scale,
+    'Home',
+  );
+}
+
+/** A closed padlock: a private or friends-only home. */
+export function lockIcon(scale = 2): HTMLCanvasElement {
+  return draw(
+    ['..gggg..', '.g....g.', '.g....g.', 'oooooooo', 'ooooyooo', 'ooooyooo', 'oooooooo'],
+    { g: '#8a8088', o: '#d99a3a', y: '#2a1b2e' },
+    scale,
+    'Locked',
+  );
+}
+
+/** An open door: an open home. */
+export function openDoorIcon(scale = 2): HTMLCanvasElement {
+  return draw(
+    ['bbbbbb..', 'bwwwwbb.', 'bwwwwbbb', 'bwwwwbbb', 'bwwwyb.b', 'bwwwwbbb', 'bwwwwbb.', 'bbbbbb..'],
+    { b: '#96694f', w: '#fbf5ea', y: '#f0c552' },
+    scale,
+    'Open',
+  );
+}
+
+/** Two little people, for friends. */
+export function friendsIcon(scale = 2): HTMLCanvasElement {
+  return draw(
+    ['.pp...cc.', '.pp...cc.', 'pppp.cccc', 'pppp.cccc', 'pppp.cccc'],
+    { p: '#d9765a', c: '#86a856' },
+    scale,
+    'Friends',
   );
 }

@@ -22,7 +22,7 @@ const TOKEN_KEY = 'study-space/token';
 const ACCOUNT_KEY = 'study-space/account';
 const IMPORTED_KEY = 'study-space/history-imported';
 
-type Purpose = 'login' | 'register' | 'other';
+type Purpose = 'login' | 'register' | 'other' | 'friends';
 
 /** Turns an HTTP failure into something a player can act on. */
 function messageFor(status: number, purpose: Purpose, serverMessage: string | undefined): string {
@@ -31,8 +31,12 @@ function messageFor(status: number, purpose: Purpose, serverMessage: string | un
       return serverMessage ?? 'Please check what you entered.';
     case 401:
       return purpose === 'login' ? 'Wrong email or password.' : 'Your sign-in has expired. Please sign in again.';
+    case 404:
+      return purpose === 'friends' ? serverMessage ?? 'No one with that name or email was found.' : serverMessage ?? 'Not found.';
     case 409:
-      return 'That email is already registered. Try signing in instead.';
+      return purpose === 'friends'
+        ? serverMessage ?? 'You are already friends, or a request is already waiting.'
+        : 'That email is already registered. Try signing in instead.';
     case 429:
       return 'Too many attempts. Wait a minute and try again.';
     case 503:
@@ -146,6 +150,15 @@ export class AccountStore {
     this.setAccount(me.account);
   }
 
+  /**
+   * A signed-in API call for other stores (friends). A rejected token signs
+   * out quietly and throws; failures come back as readable messages.
+   */
+  async authed<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+    if (!this.signedIn) throw new Error('Sign in to do that.');
+    return this.request<T>(path, 'friends', init);
+  }
+
   // ---- Internals ------------------------------------------------------------
 
   private async startSession(result: AuthResponse): Promise<void> {
@@ -230,7 +243,7 @@ export class AccountStore {
     }
     const data = (await response.json().catch(() => null)) as (T & Partial<ApiError>) | null;
     if (!response.ok) {
-      if (response.status === 401 && purpose === 'other' && this.token) {
+      if (response.status === 401 && (purpose === 'other' || purpose === 'friends') && this.token) {
         this.clearSession();
         throw new SignedOutError(messageFor(401, purpose, data?.error));
       }

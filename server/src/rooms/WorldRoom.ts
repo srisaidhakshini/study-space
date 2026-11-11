@@ -44,6 +44,7 @@ import { enqueue, retryOnce } from './persist';
 import { Player, WorldState } from '../schema/PlayerState';
 import { getWorld, type ServerMap } from '../world/maps';
 import { sendChat } from './chat';
+import { HomesController } from './homes';
 import { checkMove, parseMove } from './movement';
 import { PlayerSession } from './session';
 import { cleanText, isFiniteNumber, isPlainObject } from './text';
@@ -77,12 +78,22 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly seats = new Map<string, string>();
   private serverName = '';
   private inviteCode = '';
+  /** Homes, the residential street, the shop and their rules. */
+  private homes!: HomesController;
 
   onCreate(options: CreateOptions): void {
     this.maxClients = serverConfig.maxPlayers;
     this.maxMessagesPerSecond = 120;
     this.setPatchRate(PATCH_RATE_MS);
     this.setState(new WorldState());
+    this.homes = new HomesController({
+      sessions: this.sessions,
+      world: this.world,
+      stand: (s, now, notify) => this.stand(s, now, notify),
+      teleport: (s, reason) => this.teleport(s, reason),
+      spawnPoint: (map, spawn) => this.spawnPoint(map, spawn),
+      pushStats: (s) => this.pushStats(s),
+    });
     this.serverName = typeof options?.server === 'string' ? options.server : 'Unnamed';
     this.inviteCode = typeof options?.inviteCode === 'string' ? options.inviteCode : '';
     void this.setMetadata({ server: this.serverName, inviteCode: this.inviteCode });
@@ -104,6 +115,9 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.onMessage(C2S.videoJoin, (c) => this.withSession(c, (s) => this.video.join(s)));
     this.onMessage(C2S.videoLeave, (c) => this.video.leave(c.sessionId));
     this.onMessage(C2S.videoSignal, (c, m) => this.withSession(c, (s) => this.video.signal(s, m, Date.now())));
+    this.onMessage(C2S.homeEnter, (c, m) => this.withSession(c, (s) => void this.homes.enter(s, m)));
+    this.onMessage(C2S.homeEdit, (c, m) => this.withSession(c, (s) => this.homes.edit(s, m)));
+    this.onMessage(C2S.shopBuy, (c, m) => this.withSession(c, (s) => this.homes.buy(s, m)));
 
     this.clock.setInterval(() => this.tick(), SERVER_TICK_MS);
   }
@@ -170,6 +184,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       // Today's count, coins and streak come from the database, in order with any saves.
       void retryOnce('note login', () => touchLogin(user.id, tz));
       enqueue(user.id, () => this.pushStats(session));
+      enqueue(user.id, () => this.homes.onAccountJoin(session));
     }
 
     const welcome: WelcomeMessage = {
@@ -192,6 +207,11 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.video.leave(client.sessionId);
     this.sessions.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
+    this.homes.onLeave(s.player.map);
+  }
+
+  onDispose(): void {
+    this.homes.dispose();
   }
 
   // ---- accounts ----------------------------------------------------------
@@ -239,8 +259,9 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     if (s) fn(s);
   }
 
+  /** The map a player is on: a shared place, a street page or a home. */
   private mapOf(s: PlayerSession): ServerMap {
-    return this.world.maps.get(s.player.map)!;
+    return this.homes.resolve(s.player.map) ?? this.world.maps.get(this.world.start.map)!;
   }
 
   /** A walkable spot at or near the spawn, so arrivals do not stack exactly. */
@@ -299,6 +320,8 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       const inside =
         s.x >= r.x - DOOR_MARGIN && s.x <= r.x + r.width + DOOR_MARGIN && s.y >= r.y - DOOR_MARGIN && s.y <= r.y + r.height + DOOR_MARGIN;
       if (!inside) return;
+      // Street and home doors, and the town's way to the street, are decided by the homes controller.
+      if (this.homes.handleDoor(s, door)) return;
       const target = this.world.maps.get(door.targetMap);
       const spawn = target?.spawns.get(door.targetSpawn);
       if (!target || !spawn) return;
@@ -419,7 +442,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.withSession(client, (s) => {
       this.touch(s);
       const text = isPlainObject(raw) ? raw.text : undefined;
-      const reason = sendChat(s, text, this.sessions, this.world, serverConfig.now());
+      const reason = sendChat(s, text, this.sessions, (id) => this.homes.resolve(id), serverConfig.now());
       if (reason) {
         const denied: ChatDeniedMessage = { reason };
         client.send(S2C.chatDenied, denied);
@@ -435,7 +458,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       if (now - s.lastEmoteAt < EMOTE_COOLDOWN_MS) return;
       if (name === 'drink') {
         // Drinks are ordered standing in the cafe, never while seated.
-        const zone = zoneAt(this.world.maps.get(s.player.map)?.objects.zones ?? [], s.x, s.y);
+        const zone = zoneAt(this.mapOf(s).objects.zones, s.x, s.y);
         if (s.player.seatId !== '' || !zone?.id.startsWith(DRINK_ZONE_PREFIX)) return;
       }
       s.lastEmoteAt = now;

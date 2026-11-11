@@ -1,0 +1,498 @@
+/* ---------- Homes, shop and friends ---------- */
+
+.badge-visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.location > .pixel-icon {
+  margin-right: -2px;
+}
+
+/* Friends button with a count of waiting requests */
+
+.btn-friends {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot-badge {
+  position: absolute;
+  top: -9px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--cream);
+  background: var(--coral-dark);
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+}
+
+/* Friends panel */
+
+.friends-panel {
+  width: 520px;
+  max-width: 100%;
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+}
+
+.friends-body {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.friend-add {
+  margin-bottom: 14px;
+}
+
+.friends-section {
+  margin-bottom: 14px;
+}
+
+.friends-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.friend-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.friend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 8px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+}
+
+.friend-name {
+  flex: 1 1 120px;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.friend-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  color: var(--cocoa);
+}
+
+.friend-home-none {
+  opacity: 0.8;
+}
+
+.friend-buttons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* Edit-home panel: docked on the left on desktop, a bottom sheet on phones */
+
+body.home-editing .chat {
+  display: none;
+}
+
+.home-panel {
+  position: absolute;
+  left: calc(10px + env(safe-area-inset-left));
+  top: min(204px, 38vh);
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 0 5px 0 var(--ink);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.home-handle {
+  display: none;
+}
+
+.home-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-title {
+  flex: 1;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.home-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.home-tabs .tab {
+  flex: 1;
+  min-height: 40px;
+}
+
+.home-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.home-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.home-group {
+  margin-bottom: 14px;
+}
+
+.home-group-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cocoa);
+}
+
+.home-grid,
+.home-surfaces {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.home-card {
+  font: inherit;
+  color: var(--ink);
+  width: 100%;
+  min-height: 44px;
+  padding: 6px;
+  text-align: center;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 0 3px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.home-card:hover:not(:disabled) {
+  background: var(--sand);
+}
+
+.home-card.active {
+  background: var(--gold);
+}
+
+.home-card:disabled,
+.home-card.empty {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.home-card:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.home-card-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.home-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.home-card-count {
+  font-size: 13px;
+  color: var(--cocoa);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-preview {
+  width: 56px;
+  height: 56px;
+  background: var(--cream);
+  border: 2px solid var(--sand);
+}
+
+.home-shop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-shop-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: start;
+  padding: 6px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+}
+
+.home-shop-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.home-blurb {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.home-shop-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.home-shop-buy {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.home-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-need {
+  font-size: 14px;
+  color: var(--coral-dark);
+}
+
+.home-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.home-qty {
+  min-width: 2ch;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.home-size {
+  margin: 0 0 8px;
+}
+
+.home-upgrade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.home-upgrade-button {
+  width: 100%;
+  text-align: left;
+}
+
+.home-upgrade-label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+
+.home-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.home-segment-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  background: var(--gold);
+  border: 2px solid var(--ink);
+}
+
+.home-selection-name {
+  flex: 1 1 100px;
+  font-weight: 600;
+}
+
+.home-selection-buttons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.home-hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--cocoa);
+}
+
+@media (max-width: 720px) {
+  .btn-friends .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .btn-friends {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .friend-buttons .btn,
+  .home-card,
+  .home-selection .btn,
+  .home-shop-buy .btn {
+    min-height: 44px;
+  }
+
+  .home-panel {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    max-height: max(45vh, 260px);
+    max-height: max(45dvh, 260px);
+    padding: 0 10px calc(10px + env(safe-area-inset-bottom));
+    border-width: 3px 0 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .home-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 36px;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .home-handle:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: -3px;
+  }
+
+  .home-handle-bar {
+    width: 56px;
+    height: 6px;
+    background: var(--ink);
+  }
+
+  .home-grid,
+  .home-surfaces {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .home-panel.collapsed .home-tabs,
+  .home-panel.collapsed .home-body,
+  .home-panel.collapsed .home-hint {
+    display: none;
+  }
+}
+
+@media (max-height: 560px) {
+  .home-hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-card {
+    transition: none;
+  }
+}

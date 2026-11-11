@@ -60,6 +60,7 @@ try {
   check('/api/stats answers 503', unavailable(await api('GET', '/api/stats', undefined, token)));
   check('/api/profile answers 503', unavailable(await api('PUT', '/api/profile', { name: 'B' }, token)));
   check('/api/sessions/import answers 503', unavailable(await api('POST', '/api/sessions/import', { sessions: [] }, token)));
+  check('/api/friends answers 503', unavailable(await api('GET', '/api/friends', undefined, token)));
   check('bad input is still rejected before the database is needed', (await api('POST', '/api/auth/register', { email: 'nope', password: 'x', name: 'A' })).status === 400);
 
   // Guests do not need the database at all.
@@ -69,6 +70,16 @@ try {
   guest.onMessage('*', () => undefined);
   const snapshot = (): PlayerSnapshot | undefined => (guest.state as { players: Map<string, PlayerSnapshot> }).players?.get(guest.sessionId);
   check('a guest can join while the database is down', await until(() => snapshot() !== undefined));
+
+  // Homes need the database too: a guest asking for one is told so, and shopping needs an account.
+  const homeResults: { op: string; ok: boolean; reason?: string }[] = [];
+  guest.onMessage(S2C.homeResult, (m) => homeResults.push(m as { op: string; ok: boolean; reason?: string }));
+  guest.send(C2S.homeEnter, { ownerId: 'someone' });
+  check('visiting a home while the database is down says "unavailable"', await until(() => homeResults.some((r) => r.op === 'enter' && r.reason === 'unavailable')));
+  guest.send(C2S.shopBuy, { itemId: 'plant_tall', quantity: 1 });
+  check('a guest cannot shop', await until(() => homeResults.some((r) => r.op === 'buy' && r.reason === 'not-signed-in')));
+  guest.send(C2S.homeEdit, { version: 0, edit: { op: 'upgrade' } });
+  check('a guest cannot edit a home', await until(() => homeResults.some((r) => r.op === 'upgrade' && r.reason === 'not-signed-in')));
 
   const refused = await new Client(`ws://localhost:${PORT}`).joinById(json.roomId as string, { ...options, token }).then(
     () => null,

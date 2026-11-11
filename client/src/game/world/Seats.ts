@@ -4,9 +4,35 @@ import { TILE, type SeatDef } from '@study/shared';
 export class Seats {
   private readonly occupants = new Map<string, string>();
   private readonly byTile = new Map<string, SeatDef>();
+  private current: readonly SeatDef[];
 
-  constructor(readonly defs: readonly SeatDef[]) {
-    for (const seat of defs) this.byTile.set(`${seat.tx},${seat.ty}`, seat);
+  constructor(defs: readonly SeatDef[]) {
+    this.current = defs;
+    this.index();
+  }
+
+  /** The seats of the map right now. */
+  get defs(): readonly SeatDef[] {
+    return this.current;
+  }
+
+  /**
+   * Swaps the seat list (a home's furniture changed). Who sits where is kept
+   * by seat id, so people on seats that still exist stay seated.
+   */
+  replace(defs: readonly SeatDef[]): void {
+    this.current = defs;
+    this.index();
+  }
+
+  /** True if a seat with this id exists now. */
+  has(seatId: string): boolean {
+    return this.current.some((s) => s.id === seatId);
+  }
+
+  private index(): void {
+    this.byTile.clear();
+    for (const seat of this.current) this.byTile.set(`${seat.tx},${seat.ty}`, seat);
   }
 
   at(tx: number, ty: number): SeatDef | null {
@@ -33,7 +59,7 @@ export class Seats {
   nearestFree(x: number, y: number, maxDistance: number): SeatDef | null {
     let best: SeatDef | null = null;
     let bestDistance = maxDistance;
-    for (const seat of this.defs) {
+    for (const seat of this.current) {
       if (!this.isFree(seat.id)) continue;
       const distance = Math.hypot(seat.tx * TILE + TILE / 2 - x, seat.ty * TILE + TILE / 2 - y);
       if (distance <= bestDistance) {

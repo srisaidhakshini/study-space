@@ -8,14 +8,17 @@ import {
   type ChatDenyReason,
   type ChatMessageOut,
 } from '@study/shared';
-import type { WorldData } from '../world/maps';
+import type { ServerMap } from '../world/maps';
 import type { PlayerSession } from './session';
 import { cleanText } from './text';
 
+/** Finds the map for a runtime map id (places, street pages and homes). */
+export type MapLookup = (mapId: string) => ServerMap | undefined;
+
 /** Why a message may not be sent right now, or null if it may. */
-function denial(sender: PlayerSession, text: string, world: WorldData, now: number): ChatDenyReason | null {
+function denial(sender: PlayerSession, text: string, resolve: MapLookup, now: number): ChatDenyReason | null {
   if (text === '') return 'empty';
-  const map = world.maps.get(sender.player.map);
+  const map = resolve(sender.player.map);
   const zone = map ? zoneAt(map.objects.zones, sender.x, sender.y) : null;
   if (zone?.silent) return 'silent';
   if (sender.timer.phase === 'focus') return 'focus';
@@ -32,11 +35,11 @@ export function sendChat(
   sender: PlayerSession,
   rawText: unknown,
   sessions: ReadonlyMap<string, PlayerSession>,
-  world: WorldData,
+  resolve: MapLookup,
   now: number,
 ): ChatDenyReason | null {
   const cleaned = cleanText(rawText, CHAT_MAX_LENGTH);
-  const reason = denial(sender, cleaned, world, now);
+  const reason = denial(sender, cleaned, resolve, now);
   if (reason) return reason;
 
   sender.lastChatAt = now;

@@ -33,13 +33,13 @@ export function resetRateLimits(): void {
   perIp.clear();
 }
 
-function fail(res: Response, status: number, error: string): void {
+export function fail(res: Response, status: number, error: string): void {
   const body: ApiError = { error };
   res.status(status).json(body);
 }
 
 /** Runs an async handler; "database down" becomes a 503 and anything else a JSON 500. */
-const route =
+export const route =
   (handler: (req: Request, res: Response) => Promise<void>) =>
   (req: Request, res: Response): void => {
     handler(req, res).catch((error: unknown) => {
@@ -50,7 +50,7 @@ const route =
     });
   };
 
-function bodyOf(req: Request): Record<string, unknown> {
+export function bodyOf(req: Request): Record<string, unknown> {
   return isPlainObject(req.body) ? (req.body as Record<string, unknown>) : {};
 }
 
@@ -61,7 +61,7 @@ function bearer(req: Request): string | null {
 }
 
 /** The signed-in user's id, or null after sending a 401. */
-function requireUser(req: Request, res: Response): string | null {
+export function requireUser(req: Request, res: Response): string | null {
   const userId = verifyToken(bearer(req), serverConfig.now());
   if (!userId) {
     fail(res, 401, 'Sign in to continue');

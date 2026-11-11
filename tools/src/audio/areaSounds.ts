@@ -18,6 +18,10 @@ export const AREA_SOUNDS: Record<string, { ambience?: string; music?: string }> 
   portal: { ambience: 'amb_portal', music: 'music_lofi_night' },
   skyisland: { ambience: 'amb_sky', music: 'music_lofi_day' },
   dome: { ambience: 'amb_dome', music: 'music_lofi_night' },
+  home_1: { ambience: 'amb_library', music: 'music_lofi_day' },
+  home_2: { ambience: 'amb_library', music: 'music_lofi_day' },
+  home_3: { ambience: 'amb_library', music: 'music_lofi_day' },
+  street: { ambience: 'amb_town', music: 'music_lofi_day' },
 };
 
 /** Every sound the generator writes: audio key -> function that renders it. */

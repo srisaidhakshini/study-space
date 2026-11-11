@@ -159,6 +159,12 @@ export const C2S = {
   videoJoin: 'videoJoin',
   videoLeave: 'videoLeave',
   videoSignal: 'videoSignal',
+  /** Account players: travel to a home (own or a friend's or an open one). */
+  homeEnter: 'homeEnter',
+  /** Owner only, in their own home: change the layout, surfaces, visibility or tier. */
+  homeEdit: 'homeEdit',
+  /** Account players: buy furniture with focus coins. */
+  shopBuy: 'shopBuy',
 } as const;
 
 /** A WebRTC session description or ICE candidate for one peer (relayed untouched). */
@@ -224,6 +230,14 @@ export const S2C = {
   videoPeerJoined: 'videoPeerJoined',
   videoPeerLeft: 'videoPeerLeft',
   videoSignal: 'videoSignal',
+  /** The home you are in (sent before the teleport into it, and after every change). */
+  homeInfo: 'homeInfo',
+  /** Your furniture inventory and coins (account players). */
+  inventory: 'inventory',
+  /** Result of a homeEdit or shopBuy. */
+  homeResult: 'homeResult',
+  /** Who lives behind each door of the street page you are on. */
+  streetInfo: 'streetInfo',
 } as const;
 
 /** Sent to someone who joins voice: who is already in the call. The joiner then sends each an offer. */

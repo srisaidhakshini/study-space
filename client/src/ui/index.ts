@@ -1,7 +1,11 @@
+import './homes.css';
 import { openAccountPanel } from './AccountPanel';
 import { createChat } from './Chat';
 import { openCreator } from './Creator';
 import { h } from './dom';
+import { openFriendsPanel } from './FriendsPanel';
+import { createHomePanel } from './HomePanel';
+import { watchHomeResults } from './homeToasts';
 import { createHud } from './Hud';
 import { openPlayers } from './Players';
 import { openServerList } from './ServerList';
@@ -48,10 +52,12 @@ export function mountUi(root: HTMLElement): UiHandle {
     openTimerPanel: () => openTimerPanel(root),
     openDrinkMenu: () => openDrinkMenu(root),
     openSettings: () => openSettingsPanel(root),
+    openFriends: () => openFriendsPanel(root),
     openServers: () => showServerList(),
     openPlayers: () => openPlayers(root),
   });
-  root.append(hud, createVideoDock(), createChat(), h('div', { class: 'toast-layer' }, createToasts()));
+  watchHomeResults();
+  root.append(hud, createVideoDock(), createChat(), createHomePanel(), h('div', { class: 'toast-layer' }, createToasts()));
   return {
     openCreator: (onDone) => openCreator(root, onDone),
     openServerList(onEntered, options = {}): void {

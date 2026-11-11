@@ -12,3 +12,6 @@ export * from './protocol';
 export * from './accounts';
 export * from './worldTime';
 export * from './moderation';
+export * from './furniture';
+export * from './home';
+export * from './homeProtocol';

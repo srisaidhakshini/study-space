@@ -9,6 +9,7 @@ import { buildAllAreas } from './areas';
 import type { AreaDef } from './areas/types';
 import { PETS, renderPetSheet } from './pets';
 import { ALL_AUDIO, AREA_SOUNDS } from './audio/areaSounds';
+import { renderAllFurnitureImages } from './furniture';
 import { SR } from './audio/dsp';
 import { writeWav } from './audio/wav';
 import type { PixelCanvas } from './png';
@@ -90,6 +91,9 @@ image(FX_KEYS.zzz, 'fx/zzz.png', renderZzz());
 sheet(FX_KEYS.dust, 'fx/dust.png', renderDust(), 8, 8);
 sheet(FX_KEYS.subjectIcons, 'fx/subject_icons.png', renderSubjectIcons(), 10, 10);
 sheet(FX_KEYS.lamp, 'fx/lamp.png', renderLamp(), 16, 16);
+
+// Furniture, wallpapers, floors and the baseboard for player homes
+for (const f of renderAllFurnitureImages()) image(f.key, f.path, f.canvas);
 
 // Tilesets and maps
 const written = new Set<string>();

@@ -174,6 +174,18 @@ export class PlayerController {
     app.timer.setSeat(null);
   }
 
+  /** The seat the player sits on was removed (a home's furniture changed): stand up where we are. */
+  dropMissingSeat(): void {
+    if (!this.seat || this.seats.has(this.seat.id)) return;
+    this.standNow(this.standPosition);
+  }
+
+  /** Stops walking without changing anything else (edit mode freezes the player). */
+  halt(): void {
+    this.path = [];
+    this.pendingSeat = null;
+  }
+
   wave(): void {
     if (this.seat || this.path.length > 0) return;
     this.character.setAction('idle');

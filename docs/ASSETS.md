@@ -208,3 +208,114 @@ checks: no clipping, no DC offset, a click-free loop seam, sane length and
 level. It prints a table and writes a spectrogram of each sound to
 `tools/preview/audio_<key>.png` (waveform on top; time left to right, pitch
 low to high upward, brighter is louder).
+
+## Furniture and homes
+
+Player homes are built from three base rooms (`home_1`..`home_3`, one per tier),
+a catalog of furniture and surfaces, and the residential street. The catalog
+lives in `shared/src/furniture.ts` and is the single source of truth: the art
+generator draws exactly those items, the server validates against them and
+the client shop lists them.
+
+### Furniture images
+
+Every item has one PNG per **view**, `client/public/assets/furniture/furn_<id>_<view>.png`,
+registered in the manifest `images` under `furniture_image_key(id, view)`
+(`furn_<id>_<view>`). A view is a rotation: `rotations` in the catalog says how
+many views exist (1 = fixed, 2 = views 0 and 1, 4 = all four). Wall items only
+have view 0.
+
+- **Size:** `(fw * 16) x ((fh + lift) * 16)` pixels, where `(fw, fh)` is the
+  footprint at that rotation. Views 0 and 2 keep the catalog `w x h`, views 1
+  and 3 swap them. `lift` extra tile rows of picture sit **above** the footprint
+  (tall shelves, wardrobes, plants, lamps).
+- **Anchor:** the footprint is the bottom `fw x fh` tiles of the image. The
+  object's base must touch the bottom row of the picture (the checker enforces
+  this), so it sits exactly on its footprint when drawn with its bottom edge at
+  the footprint's bottom edge.
+- **Transparent background**, dark ink outline (rugs are flat and have none, so
+  characters walking over them stay readable).
+- **Rotation 0 faces down** (the front is visible). Rotations are quarter turns
+  clockwise: 1 faces left, 2 faces up (back visible), 3 faces right. Draw each
+  view by rendering the rotated layout, not by rotating pixels: a chair at
+  `seats[0]` moves to where `rotateCell` puts it.
+- **Seats** are part of the picture: the chair, sofa cushion or beanbag must be
+  drawn on the seat cell given in the catalog.
+- The depth order of the world is decided by the client (it sorts items by the
+  bottom edge of their footprint), so a tall item never needs extra padding.
+
+Surfaces are seamless 16x16 tiles: `furniture/surf_<id>.png` under the key
+`surf_<id>` (six wallpapers and six floors). `home_baseboard` is a 16x16
+skirting strip (transparent above) the client draws along the bottom of the
+back wall.
+
+### Base rooms
+
+Maps `home_1`, `home_2` and `home_3` (HUD name "Home", indoor, warm tint) are
+plain Tiled maps with the usual layers. Coordinates are described in
+`shared/src/home.ts`:
+
+- Tile columns 0 and W-1 are side walls, rows 0..2 are the back wall, the floor
+  fills the rest, and the last row is the bottom wall with a **doorway at tile
+  columns 1..2** (room columns 0..1). Room column `x` is map tile `x + 1`.
+- Floor sizes: tier 1 is 10x6, tier 2 is 14x8, tier 3 is 18x10 tiles. Upgrading
+  only adds floor to the right and bottom, so saved positions never move.
+- The `collision` layer equals `homeCollision(emptyLayout)` exactly; the
+  generator throws if it ever differs.
+- Objects: spawn `entrance` (just inside the door, facing up), door `exit` on
+  the doorway (its target is a placeholder: the server sends you to your
+  house's door on the right street page), zone `home`. There are **no seats and
+  no furniture** in the base maps: seats come from the owner's layout.
+- The ground and wall layers hold the default oak floor and cream wallpaper.
+  The client repaints those two rectangles from the chosen surfaces and draws
+  the baseboard, so the Tiled layers are the fallback and editor view.
+
+### Residential street
+
+Map `street` ("Residential Street", outdoor, 60x31 tiles): a road with a
+promenade, six houses on the north side and six on the south side.
+
+- Doors `house-1`..`house-12` (north row left to right, then south row left to
+  right) have **empty targets**: the server resolves them from the street page
+  (house number = `(page - 1) * 12 + slot`). Spawns `from-house-1`..`from-house-12`
+  stand just in front of each door.
+- The wall above every door is left plain for the name plate the client draws
+  (3 tiles wide, the top wall row of the house).
+- Gates `west` and `east` at the ends of the road (targets also dynamic: on
+  page 1 the west gate leads to the hub's `from-street`). Spawns `entrance` and
+  `from-west` at the west end, `from-east` at the east end.
+- Eight bench seats (zone `street`) in two small parks; lamp posts between the
+  houses (generated lights); zone `street`.
+- The hub gains a gate on the west end of its road: door `to-street` (target
+  `street` / `from-west`) and spawn `from-street`.
+
+### Checks and previews
+
+- `npm run check:furniture -w tools` (after `npm run assets`): every item and
+  view exists at exactly the right size, is not empty, touches its footprint's
+  bottom row, tall items really rise above their footprint, and every surface
+  tiles without a visible seam.
+- `npm run preview:furniture -w tools` writes `tools/preview/furniture.png` (all
+  items, all views, backdrop in a neutral colour) and `surfaces.png` (each
+  surface tiled 6x6). `npx tsx tools/src/furniture/zoom.ts desk_basic sofa`
+  writes a 6x close-up to `tools/preview/zoom.png`.
+- `npm run check -w tools` treats the doors `exit`, `west`, `east` and
+  `house-N` as dynamic; every other door must resolve to an existing map and
+  spawn, and every seat, door and spawn must be reachable.
+
+### Adding a furniture item
+
+1. Add an entry to `FURNITURE` in `shared/src/furniture.ts`: id, name,
+   category, placement (`floor`, `rug` or `wall`), footprint `w x h`, `lift`,
+   `rotations`, price, seats (rotation-0 cells inside the footprint) and, for
+   lights, a `glow` radius.
+2. Add a painter in `tools/src/furniture/items.ts` (`PAINTERS['<id>']`). It
+   receives the canvas and a `ViewCtx`; use `ctx.rect(x0, y0, x1, y1, up)` for the
+   pixel area of rotation-0 cells in the current view and `ctx.facing(...)` to
+   turn a facing. Reusable parts are in `painters.ts` (desks, chairs, beds,
+   sofas, shelves, cabinets, rugs, plants) and `kit.ts` (the oblique box).
+3. Run `npm run assets` and `npm run check:furniture -w tools`, then look at
+   `npm run preview:furniture -w tools`.
+
+To use bought art instead, override the image keys (`furn_<id>_<view>`) in
+`client/assets.overrides.json` with PNGs of the sizes above.

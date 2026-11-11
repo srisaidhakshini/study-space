@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "test": "tsx src/smoke.test.ts && tsx src/accounts.test.ts && tsx src/offline.test.ts",
-    "test:db": "tsx src/accounts.test.ts && tsx src/offline.test.ts",
+    "test": "tsx src/smoke.test.ts && tsx src/accounts.test.ts && tsx src/homes.test.ts && tsx src/offline.test.ts",
+    "test:db": "tsx src/accounts.test.ts && tsx src/homes.test.ts && tsx src/offline.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

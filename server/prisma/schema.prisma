@@ -27,6 +27,12 @@ model User {
 
   sessions     StudySession[]
   transactions CoinTransaction[]
+  home         Home?
+  inventory    InventoryItem[]
+  surfaces     OwnedSurface[]
+  /// Friend requests this user sent and received (see Friendship).
+  friendsSent     Friendship[] @relation("FriendRequester")
+  friendsReceived Friendship[] @relation("FriendAddressee")
 }
 
 model StudySession {
@@ -64,4 +70,74 @@ model CoinTransaction {
   session StudySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+}
+
+enum HomeVisibility {
+  PRIVATE
+  FRIENDS
+  OPEN
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+/// One home per account. See docs/HOMES.md.
+model Home {
+  id         String         @id @default(cuid())
+  ownerId    String         @unique
+  /// House number: which door of which street page leads here.
+  number     Int            @unique @default(autoincrement())
+  tier       Int            @default(1)
+  visibility HomeVisibility @default(FRIENDS)
+  wallpaper  String         @default("wp_cream")
+  floor      String         @default("fl_oak")
+  /// The list of {itemId, x, y, rotation} placed in the room.
+  layout     Json           @default("[]")
+  /// Increments on every accepted edit; writes are conditional on it.
+  version    Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+}
+
+/// How many of a furniture item an account owns (placed and unplaced alike).
+model InventoryItem {
+  id     String @id @default(cuid())
+  userId String
+  itemId String
+  count  Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+}
+
+/// Wallpapers and floors bought by an account (the defaults are always owned and not stored).
+model OwnedSurface {
+  id        String @id @default(cuid())
+  userId    String
+  surfaceId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, surfaceId])
+}
+
+/// A friend request (PENDING) or friendship (ACCEPTED). One row per pair of people;
+/// the code refuses a second row in the opposite direction.
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+
+  requester User @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId])
 }

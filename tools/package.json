@@ -8,6 +8,8 @@
     "preview": "tsx src/preview.ts",
     "check": "tsx src/check.ts",
     "check:audio": "tsx src/audio/check.ts",
+    "check:furniture": "tsx src/furniture/check.ts",
+    "preview:furniture": "tsx src/furniture/sheet.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

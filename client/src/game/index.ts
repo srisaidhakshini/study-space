@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
+import { baseMapId } from '@study/shared';
 import { app } from '../app';
 import { bus } from '../bus';
 import { SCENES } from './depths';
+import { devHomeRequested, installDevHome } from './home/homeDev';
 import { BootScene } from './scenes/BootScene';
 import { OverlayScene } from './scenes/OverlayScene';
 import { WorldScene, type WorldInit } from './scenes/WorldScene';
@@ -15,6 +17,11 @@ export interface GameHandle {
   startWorld(): void;
 }
 
+/** True if the map (a shared place, a home or a street page) can be drawn from the manifest. */
+function mapAvailable(mapId: string): boolean {
+  return baseMapId(mapId, app.homes.info?.tier) in app.manifest.maps;
+}
+
 /** Where the world should open right now. */
 function entryPoint(): WorldInit {
   const net = app.net;
@@ -25,8 +32,10 @@ function entryPoint(): WorldInit {
       : net.welcome
         ? { map: net.welcome.map, x: net.welcome.x, y: net.welcome.y, facing: net.welcome.dir }
         : null;
-    if (at && app.manifest.maps[at.map]) return { map: at.map, spawn: '', at: { x: at.x, y: at.y, facing: at.facing } };
+    if (at && mapAvailable(at.map)) return { map: at.map, spawn: '', at: { x: at.x, y: at.y, facing: at.facing } };
   }
+  // Dev only: ?home=1 opens a furnished home with a local stand-in for the server (&edit=1 starts editing).
+  if (devHomeRequested() && 'home_1' in app.manifest.maps) return { map: installDevHome(), spawn: 'entrance' };
   // Solo shortcut for testing a map: http://localhost:5173/?map=cafe&spawn=entrance
   const params = new URLSearchParams(window.location.search);
   const wanted = params.get('map');

@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MAX_PLAYERS_PER_ROOM, ROOM_NAME, SIGNAL_MAX_PAYLOAD, type ApiError } from '@study/shared';
 import { registerAccountRoutes } from './api/accountRoutes';
+import { registerFriendRoutes } from './api/friendRoutes';
 import { registerRoutes } from './api/routes';
 import { assertAuthConfig, isProductionEnv, serverConfig } from './config';
 import { closeDb } from './db/client';
@@ -48,6 +49,7 @@ export function createServer(settings: ServerSettings = {}): GameServer {
       app.use(express.json({ limit: '4kb' }));
       registerRoutes(app);
       registerAccountRoutes(app);
+      registerFriendRoutes(app);
       // Serve the built game and its websocket/API from one public origin.
       const clientDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
       if (existsSync(resolve(clientDir, 'index.html'))) {

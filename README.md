@@ -7,8 +7,8 @@ character, sit at a desk, and run a focus timer that floats above your head.
 server, synced movement, server-side timers, chat rules), nine places with
 their own ambience and lo-fi music, a day/night cycle with weather, accounts
 (Postgres via Prisma: look, history, streaks and focus coins), WebRTC voice
-calls and study-desk video, and a one-host deployment path. Homes and the shop,
-the shared tree growth, buddy desks and final polish come next.
+calls and study-desk video, and a one-host deployment path. Player homes with a furniture shop, edit mode and friends are in.
+The shared tree growth, buddy desks and final polish come next.
 
 ## Run it
 
@@ -130,6 +130,17 @@ Both run peer to peer over WebRTC; the game server only relays the signalling.
 - The stats page (click the "today" chip) shows today, streaks, a 14-day
   chart, subjects, totals and recent sessions.
 - Not built yet: email verification, password reset, social sign-in.
+
+## Homes, shop and friends
+
+Every account has a private room, reached from the **Home** button or from its
+door on the residential street (west end of the town road). **Edit** lets you
+place, move, rotate and remove furniture on the grid; the shop sells furniture,
+wallpapers and floors for focus coins, which you only earn by finishing study
+sessions. You can upgrade the room twice (14×8 for 600 coins, 18×10 for 1800),
+set it to private, friends-only or open, and study at your home desk. Add
+friends from the **Friends** button, then visit them from the list. Details in
+[docs/HOMES.md](docs/HOMES.md).
 
 ## Multiplayer rules
 

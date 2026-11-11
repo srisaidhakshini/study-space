@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import {
   FX_KEYS,
+  parseMapId,
   rectContains,
   TILE,
   zoneAt,
@@ -16,6 +17,9 @@ import { bus } from '../../bus';
 import { Character } from '../character/Character';
 import { Pet } from '../character/Pet';
 import { DEPTH, SCENES } from '../depths';
+import { HomeEditor } from '../home/HomeEditor';
+import { HomeView } from '../home/HomeView';
+import { StreetView } from '../home/StreetView';
 import { PlayerController } from '../player/PlayerController';
 import { RemotePlayers } from '../remote/RemotePlayers';
 import { Sky } from '../sky/Sky';
@@ -39,6 +43,28 @@ const FADE_MS = 250;
 const MOVE_SEND_MS = 100;
 /** Online, how long to wait for the server to open a door before trying again. */
 const DOOR_REPLY_MS = 1500;
+/** Doors whose destination depends on the player's house and street page; the server decides. */
+const DYNAMIC_DOOR = /^(exit|west|east|house-\d+)$/;
+/** How long to wait for the server's home layout before giving up and going back to town. */
+const HOME_WAIT_MS = 5000;
+/** Height reserved at the top for the HUD chips while editing a home. */
+const EDIT_TOP_INSET = 90;
+/** How often edit mode re-reads where the interface's edit panel sits. */
+const EDIT_PANEL_POLL_MS = 250;
+
+/**
+ * Where the home edit panel (owned by the interface layer) covers the screen:
+ * a column on the left on wide screens, a sheet along the bottom on narrow
+ * ones. Measured from the page so the room can be centred in what is left.
+ */
+function editPanelInset(): { left: number; bottom: number } {
+  const panel = document.querySelector('.home-panel');
+  if (!panel) return { left: 0, bottom: 0 };
+  const r = panel.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return { left: 0, bottom: 0 };
+  if (r.width < window.innerWidth * 0.7 && r.left < 60) return { left: Math.round(r.right + 10), bottom: 0 };
+  return { left: 0, bottom: Math.max(0, Math.round(window.innerHeight - r.top + 6)) };
+}
 
 function isTyping(): boolean {
   const el = document.activeElement;
@@ -58,6 +84,22 @@ export class WorldScene extends Phaser.Scene {
   private lamps!: Lamps;
   /** Day, night, weather and street lamps; outdoor maps only. */
   private sky: Sky | null = null;
+  /** The inside of a home (furniture, surfaces), on home maps only. */
+  private homeView: HomeView | null = null;
+  /** Owner edit mode for the home, on home maps only. */
+  private editor: HomeEditor | null = null;
+  /** Signs on the residential street. */
+  private street: StreetView | null = null;
+  /** Owner of the home this scene shows, or null on other maps. */
+  private homeOwner: string | null = null;
+  private homeTier = 1;
+  private waitingForHome = false;
+  private editing = false;
+  /** The dynamic door the player stands in, so it is only tried once per visit. */
+  private insideDoor: string | null = null;
+  private mapLabel = '';
+  private editInset = { left: 0, bottom: 0 };
+  private lastPanelPoll = 0;
   private player!: Character;
   private controller!: PlayerController;
   private pet: Pet | null = null;
@@ -90,9 +132,33 @@ export class WorldScene extends Phaser.Scene {
 
     this.travelling = false;
     this.seatWasNear = false;
-    this.map = loadMap(this, this.target.map);
+    this.editing = false;
+    this.insideDoor = null;
+    this.homeView = null;
+    this.editor = null;
+    this.street = null;
+    this.waitingForHome = false;
+    const parsed = parseMapId(this.target.map);
+    this.homeOwner = parsed.kind === 'home' ? parsed.ownerId : null;
+    if (this.homeOwner !== null) {
+      // The server sends the home's layout just before the teleport into it.
+      const info = app.homes.info;
+      if (!info || info.ownerId !== this.homeOwner) {
+        this.waitForHome();
+        return;
+      }
+      this.homeTier = info.tier;
+    }
+    this.map = loadMap(this, this.target.map, this.homeTier);
     this.seats = new Seats(this.map.objects.seats);
     this.lamps = new Lamps(this, this.map.objects.lamps);
+    const homeInfo = this.homeOwner !== null ? app.homes.info : null;
+    this.mapLabel =
+      homeInfo !== null
+        ? homeInfo.ownerName + "'s home"
+        : parsed.kind === 'street' && parsed.page > 1
+          ? this.map.entry.name + ' ' + parsed.page
+          : this.map.entry.name;
 
     const spawn =
       this.target.at ??
@@ -110,6 +176,14 @@ export class WorldScene extends Phaser.Scene {
     this.overlay = this.scene.get(SCENES.overlay) as OverlayScene;
     this.overlay.track(this.player);
     this.remotes = new RemotePlayers(this, this.overlay, this.seats, this.map.id);
+    if (homeInfo !== null) {
+      this.homeView = new HomeView(this, this.map.grid, this.seats);
+      this.homeView.apply(homeInfo);
+      this.editor = new HomeEditor(this, isTyping);
+    }
+    if (parsed.kind === 'street' || this.map.baseId === 'street') {
+      this.street = new StreetView(this, this.overlay, this.map.objects.doors, parsed.kind === 'street' ? parsed.page : 1);
+    }
     if (!this.map.entry.indoor) {
       this.sky = new Sky(this, this.map.widthPx, this.map.heightPx, this.map.objects.lights, () => this.overlay);
     }
@@ -127,6 +201,7 @@ export class WorldScene extends Phaser.Scene {
         this.locked = locked;
       }),
       app.profile.changed.subscribe((next) => this.applyProfile(next)),
+      app.homes.changed.subscribe(() => this.homesChanged()),
       app.net.teleports.subscribe((message) => this.teleported(message)),
       app.net.corrections.subscribe((message) => this.controller.applyCorrection(message.x, message.y)),
       app.net.sitResults.subscribe((result) => this.controller.applySitResult(result)),
@@ -142,11 +217,33 @@ export class WorldScene extends Phaser.Scene {
     bus.emit('seat:near', { available: false });
     this.sentMoving = false;
     this.sinceMoveSent = MOVE_SEND_MS;
+    this.syncEditMode();
+    // Dev builds only: a handle for poking at the scene from the console (window.__world).
+    if (import.meta.env.DEV) (window as unknown as { __world?: WorldScene }).__world = this;
+  }
+
+  /**
+   * A home was entered before its layout arrived (or the layout belongs to a
+   * different home). Wait briefly for the server's homeInfo, then restart
+   * into the home, or give up and return to town.
+   */
+  private waitForHome(): void {
+    this.waitingForHome = true;
+    const timer = this.time.delayedCall(HOME_WAIT_MS, () => {
+      bus.emit('toast', { text: "Couldn't open that home." });
+      this.scene.restart({ map: 'hub', spawn: 'start' } satisfies WorldInit);
+    });
+    const off = app.homes.changed.subscribe(() => {
+      if (app.homes.info?.ownerId === this.homeOwner) this.scene.restart(this.target);
+    });
+    this.cleanup = [off, () => timer.remove(false)];
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shutdown());
   }
 
   update(_time: number, delta: number): void {
+    if (this.waitingForHome) return;
     const dt = Math.min(delta, 100);
-    const active = !this.locked && !this.travelling && !isTyping();
+    const active = !this.locked && !this.travelling && !isTyping() && !this.editing;
     let axisX = 0;
     let axisY = 0;
     if (active) {
@@ -160,6 +257,9 @@ export class WorldScene extends Phaser.Scene {
     this.pet?.update(dt, this.player.x, this.player.y);
     this.remotes.update(dt);
     this.sky?.update(dt);
+    this.homeView?.update(dt);
+    this.editor?.update();
+    this.pollEditPanel();
     this.sendMove(dt);
 
     const focusSeat = app.timer.state.phase === 'focus' ? app.timer.seatId : null;
@@ -200,7 +300,7 @@ export class WorldScene extends Phaser.Scene {
 
   private setupCamera(): void {
     const camera = this.cameras.main;
-    const fit = (): void => fitCamera(camera, this.scale.width, this.scale.height, this.map);
+    const fit = (): void => this.refitCamera();
     fit();
     camera.setRoundPixels(true);
     camera.startFollow(this.player, true, 0.2, 0.2);
@@ -223,14 +323,89 @@ export class WorldScene extends Phaser.Scene {
     });
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       this.controller.noteInput();
+      if (this.editor?.active) {
+        if (!this.locked && !this.travelling) this.editor.pointerDown(pointer);
+        return;
+      }
       const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
       this.whenFree(() => this.controller.moveTo(point.x, point.y));
     });
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => this.editor?.pointerMove(pointer));
   }
 
-  /** Runs an input action unless a menu is open or the scene is changing. */
+  /** Runs an input action unless a menu is open, the scene is changing or the home is being edited. */
   private whenFree(action: () => void): void {
-    if (!this.locked && !this.travelling) action();
+    if (!this.locked && !this.travelling && !this.editing) action();
+  }
+
+  /** The home's layout or the editing state changed. */
+  private homesChanged(): void {
+    const info = app.homes.info;
+    if (this.homeView && info && info.ownerId === this.homeOwner) {
+      if (info.tier !== this.homeTier) {
+        // The room grew: reload into the bigger map, standing where we are.
+        this.go({ map: this.map.id, spawn: '', at: { x: this.player.x, y: this.player.y, facing: this.player.facing } });
+        return;
+      }
+      if (info !== this.homeView.info) {
+        this.homeView.apply(info);
+        this.controller.dropMissingSeat();
+      }
+    }
+    this.syncEditMode();
+  }
+
+  /** Edit mode freezes the player and holds the camera on the room. */
+  private syncEditMode(): void {
+    if (!this.editor) return;
+    this.editor.sync();
+    const editing = this.editor.active;
+    if (editing === this.editing) return;
+    this.editing = editing;
+    const camera = this.cameras.main;
+    if (editing) {
+      this.controller.halt();
+      camera.stopFollow();
+      this.editInset = editPanelInset();
+      this.refitCamera();
+    } else {
+      this.refitCamera();
+      camera.startFollow(this.player, true, 0.2, 0.2);
+    }
+  }
+
+  /** Sizes the camera for the map; while editing a home, centres the room in the space the panel leaves free. */
+  private refitCamera(): void {
+    const camera = this.cameras.main;
+    const { width, height } = this.scale;
+    fitCamera(camera, width, height, this.map);
+    if (!this.editing) return;
+    const free = {
+      x: this.editInset.left,
+      y: EDIT_TOP_INSET,
+      w: Math.max(120, width - this.editInset.left),
+      h: Math.max(120, height - EDIT_TOP_INSET - this.editInset.bottom),
+    };
+    const zoom = Phaser.Math.Clamp(Math.floor(Math.min((free.w * 0.94) / this.map.widthPx, (free.h * 0.94) / this.map.heightPx)), 1, 6);
+    camera.setZoom(zoom);
+    camera.setBounds(-4000, -4000, this.map.widthPx + 8000, this.map.heightPx + 8000);
+    // Put the room's centre at the middle of the free area rather than the middle of the screen.
+    camera.centerOn(
+      this.map.widthPx / 2 + (width / 2 - (free.x + free.w / 2)) / zoom,
+      this.map.heightPx / 2 + (height / 2 - (free.y + free.h / 2)) / zoom,
+    );
+  }
+
+  /** Edit mode: notice when the interface's panel is resized, collapsed or moved, and recentre the room. */
+  private pollEditPanel(): void {
+    if (!this.editing) return;
+    const now = Date.now();
+    if (now - this.lastPanelPoll < EDIT_PANEL_POLL_MS) return;
+    this.lastPanelPoll = now;
+    const next = editPanelInset();
+    if (next.left === this.editInset.left && next.bottom === this.editInset.bottom) return;
+    this.editInset = next;
+    this.refitCamera();
   }
 
   private setPet(petId: string): void {
@@ -264,7 +439,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private emitLocation(): void {
-    bus.emit('location', { mapId: this.map.id, mapName: this.map.entry.name, zone: this.zone });
+    // The audio manager and HUD look the map up in the manifest, so report the base id.
+    bus.emit('location', { mapId: this.map.baseId, mapName: this.mapLabel, zone: this.zone });
   }
 
   private checkZone(): void {
@@ -277,10 +453,42 @@ export class WorldScene extends Phaser.Scene {
   private checkDoors(): void {
     const { x, y } = this.player;
     const door = this.map.objects.doors.find((d) => rectContains(d.rect, x, y));
-    if (door) this.travel(door);
+    if (!door) {
+      this.insideDoor = null;
+      return;
+    }
+    this.travel(door);
+  }
+
+  /**
+   * House doors, street gates and a home's exit lead wherever the server says
+   * (it knows the street page and who may enter). Ask once per visit to the door;
+   * a refusal arrives as a message and the player simply stays outside.
+   */
+  private travelDynamic(door: DoorDef): void {
+    if (this.insideDoor === door.id) return;
+    this.insideDoor = door.id;
+    if (app.net.online) {
+      app.net.sendDoor(door.id);
+      return;
+    }
+    // Offline there are no residents: the west gate still leads back to town.
+    if (door.id === 'west' && this.map.baseId === 'street') {
+      this.go({ map: 'hub', spawn: 'from-street' });
+      return;
+    }
+    if (door.id === 'exit') {
+      this.go({ map: 'street', spawn: 'from-house-1' });
+      return;
+    }
+    bus.emit('toast', { text: 'Join a server and sign in to visit homes.' });
   }
 
   private travel(door: DoorDef): void {
+    if (DYNAMIC_DOOR.test(door.id)) {
+      this.travelDynamic(door);
+      return;
+    }
     if (!app.manifest.maps[door.targetMap]) {
       console.warn(`Door "${door.id}" leads to unknown map "${door.targetMap}"`);
       return;
@@ -307,10 +515,20 @@ export class WorldScene extends Phaser.Scene {
   private shutdown(): void {
     for (const off of this.cleanup) off();
     this.cleanup = [];
+    if (this.waitingForHome) {
+      this.waitingForHome = false;
+      return;
+    }
     this.controller.dispose();
     this.remotes.destroy();
     this.sky?.destroy();
     this.sky = null;
+    this.homeView?.destroy();
+    this.homeView = null;
+    this.editor?.destroy();
+    this.editor = null;
+    this.street?.destroy();
+    this.street = null;
     this.overlay.clear();
     this.pet = null;
     this.petId = '';

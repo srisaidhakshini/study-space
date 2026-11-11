@@ -14,6 +14,12 @@ import {
   type DoorMessage,
   type EmoteMessage,
   type EmoteName,
+  type HomeEditMessage,
+  type HomeEditOp,
+  type HomeEnterMessage,
+  type HomeInfoMessage,
+  type HomeResultMessage,
+  type InventoryMessage,
   type JoinOptions,
   type JoinRequest,
   type JoinResponse,
@@ -25,11 +31,13 @@ import {
   type ReportMessage,
   type ServerListEntry,
   type ServerListResponse,
+  type ShopBuyMessage,
   type SessionMessage,
   type SessionRecord,
   type SitMessage,
   type SitResultMessage,
   type StatsMessage,
+  type StreetInfoMessage,
   type TeleportMessage,
   type TimerConfig,
   type TimerEvent,
@@ -85,6 +93,11 @@ export class NetClient implements NetApi {
   readonly sessionRecords = new Emitter<SessionRecord>();
   /** Coins, today's totals and streak, pushed to signed-in players. */
   readonly stats = new Emitter<StatsMessage>();
+  /** Homes: the home you are in, your furniture, results of edits and purchases, and the street page. */
+  readonly homeInfos = new Emitter<HomeInfoMessage>();
+  readonly inventories = new Emitter<InventoryMessage>();
+  readonly homeResults = new Emitter<HomeResultMessage>();
+  readonly streetInfos = new Emitter<StreetInfoMessage>();
 
   status: NetStatus = 'offline';
   serverName = '';
@@ -273,6 +286,15 @@ export class NetClient implements NetApi {
   sendEmote(name: EmoteName): void {
     this.send<EmoteMessage>(C2S.emote, { name });
   }
+  sendHomeEnter(ownerId: string): void {
+    this.send<HomeEnterMessage>(C2S.homeEnter, { ownerId });
+  }
+  sendHomeEdit(version: number, edit: HomeEditOp): void {
+    this.send<HomeEditMessage>(C2S.homeEdit, { version, edit });
+  }
+  sendShopBuy(itemId: string, quantity: number): void {
+    this.send<ShopBuyMessage>(C2S.shopBuy, { itemId, quantity });
+  }
 
   // ---- Internals ---------------------------------------------------------
 
@@ -372,6 +394,10 @@ export class NetClient implements NetApi {
     room.onMessage(S2C.timerEvent, (m: TimerEventMessage) => this.timerEvents.emit(m.event));
     room.onMessage(S2C.session, (m: SessionMessage) => this.sessionRecords.emit(m.record));
     room.onMessage(S2C.stats, (m: StatsMessage) => this.stats.emit(m));
+    room.onMessage(S2C.homeInfo, (m: HomeInfoMessage) => this.homeInfos.emit(m));
+    room.onMessage(S2C.inventory, (m: InventoryMessage) => this.inventories.emit(m));
+    room.onMessage(S2C.homeResult, (m: HomeResultMessage) => this.homeResults.emit(m));
+    room.onMessage(S2C.streetInfo, (m: StreetInfoMessage) => this.streetInfos.emit(m));
     room.onMessage(S2C.notice, (m: NoticeMessage) => bus.emit('toast', { text: m.text }));
     room.onMessage(S2C.chatDenied, (m: ChatDeniedMessage) => bus.emit('chat:denied', { reason: m.reason }));
     room.onMessage(S2C.chat, (m: ChatMessageOut) => this.receiveChat(m));

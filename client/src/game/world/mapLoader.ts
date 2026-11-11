@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  baseMapId,
   createGrid,
   LAYERS,
   parseMapObjects,
@@ -14,7 +15,10 @@ import { app } from '../../app';
 import { DEPTH } from '../depths';
 
 export interface LoadedMap {
+  /** The full runtime id (`home:<owner>`, `street:2`, `cafe`): what the server calls this map. */
   id: string;
+  /** The manifest map it is drawn from (`home_1`, `street`, `cafe`). */
+  baseId: string;
   entry: MapEntry;
   widthPx: number;
   heightPx: number;
@@ -59,10 +63,11 @@ function buildGrid(map: Phaser.Tilemaps.Tilemap): CollisionGrid {
  * Builds a Tiled map in the scene: static tile layers, y-sorted furniture,
  * the collision grid and the typed objects.
  */
-export function loadMap(scene: Phaser.Scene, id: string): LoadedMap {
-  const entry = app.manifest.maps[id];
-  if (!entry) throw new Error(`Map "${id}" is not in the asset manifest`);
-  const map = scene.make.tilemap({ key: id });
+export function loadMap(scene: Phaser.Scene, id: string, homeTier = 1): LoadedMap {
+  const baseId = baseMapId(id, homeTier);
+  const entry = app.manifest.maps[baseId];
+  if (!entry) throw new Error(`Map "${baseId}" is not in the asset manifest`);
+  const map = scene.make.tilemap({ key: baseId });
 
   const tilesets: Phaser.Tilemaps.Tileset[] = [];
   for (const [tiledName, textureKey] of Object.entries(entry.tilesets)) {
@@ -94,7 +99,7 @@ export function loadMap(scene: Phaser.Scene, id: string): LoadedMap {
       .setDepth(DEPTH.ambient);
   }
 
-  return { id, entry, widthPx, heightPx, grid: buildGrid(map), objects: parseMapObjects(raw) };
+  return { id, baseId, entry, widthPx, heightPx, grid: buildGrid(map), objects: parseMapObjects(raw) };
 }
 
 /**
@@ -102,7 +107,12 @@ export function loadMap(scene: Phaser.Scene, id: string): LoadedMap {
  * centring maps that are smaller than the view.
  */
 export function fitCamera(camera: Phaser.Cameras.Scene2D.Camera, viewW: number, viewH: number, map: LoadedMap): void {
-  const zoom = Phaser.Math.Clamp(Math.floor(Math.min(viewW / 480, viewH / 300)), 2, 6);
+  // A home is one small room: zoom in until it fills most of the view, leaving
+  // room for the edit panels around it. Other maps use a fixed field of view.
+  const room = map.baseId.startsWith('home_');
+  const zoom = room
+    ? Phaser.Math.Clamp(Math.floor(Math.min((viewW * 0.72) / map.widthPx, (viewH * 0.78) / map.heightPx)), 2, 6)
+    : Phaser.Math.Clamp(Math.floor(Math.min(viewW / 480, viewH / 300)), 2, 6);
   camera.setSize(viewW, viewH);
   camera.setZoom(zoom);
   const visibleW = viewW / zoom;

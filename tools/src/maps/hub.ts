@@ -42,7 +42,7 @@ const inPlaza = (x: number, y: number): boolean => inRect(x, y, 14, 13, 12, 8);
 const inPath = (x: number, y: number): boolean =>
   !inPlaza(x, y) &&
   (inRect(x, y, 19, 9, 2, 18) || // library door to the south end
-    inRect(x, y, 3, 16, 37, 2) || // east-west road, out to the riverside
+    inRect(x, y, 0, 16, 40, 2) || // east-west road, from the residential street to the riverside
     inRect(x, y, 32, 7, 2, 9) || // garden gate down to the road
     inRect(x, y, 6, 15, 2, 1) || // kitchen door
     inRect(x, y, 31, 15, 2, 1) || // cafe door
@@ -97,8 +97,10 @@ export function buildHub(tiles: Tileset): MapBuilder {
     m.block('furniture', x, 27, 'tree', 2, 3);
   }
   for (let y = 3; y <= 24; y += 3) {
-    m.block('furniture', 0, y, 'tree', 2, 3);
-    if (y !== 15) m.block('furniture', 38, y, 'tree', 2, 3);
+    if (y !== 15) {
+      m.block('furniture', 0, y, 'tree', 2, 3);
+      m.block('furniture', 38, y, 'tree', 2, 3);
+    }
   }
   m.fill('furniture', 12, 0, 16, 2, 'bush');
   for (const [x, y] of [[5, 4], [9, 5], [3, 19], [13, 23], [36, 4], [24, 23]] as const) {
@@ -145,5 +147,8 @@ export function buildHub(tiles: Tileset): MapBuilder {
   // The riverside lies off the east end of the road.
   m.door('to-riverside', 38 * TILE, 16 * TILE, 2 * TILE, 2 * TILE, 'riverside', 'entrance');
   m.spawn('from-riverside', 36.5, 16, 'left');
+  // The residential street lies off the west end of the same road.
+  m.door('to-street', 0, 16 * TILE, 2 * TILE, 2 * TILE, 'street', 'from-west');
+  m.spawn('from-street', 3, 16, 'right');
   return m;
 }

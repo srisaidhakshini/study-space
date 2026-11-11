@@ -3,6 +3,7 @@ import { buildLibrary } from '../maps/library';
 import { buildLibraryTileset } from '../tiles/library';
 import { buildTownTileset } from '../tiles/town';
 import { buildCozyAreas } from './cozy';
+import { buildHomeAreas } from './homes';
 import { buildOutdoorAreas } from './outdoor';
 import { buildWorldAreas } from './worlds';
 import type { AreaDef } from './types';
@@ -10,7 +11,8 @@ import type { AreaDef } from './types';
 /**
  * Every map in the game. The hub and the library come first, then the
  * areas grouped by file: cozy interiors (cafe, kitchen), outdoor areas
- * (garden, riverside) and the portal room with the two other worlds.
+ * (garden, riverside), the portal room with the two other worlds, and
+ * the player homes with the residential street that leads to them.
  */
 export function buildAllAreas(): AreaDef[] {
   const town = buildTownTileset();
@@ -21,5 +23,6 @@ export function buildAllAreas(): AreaDef[] {
     ...buildCozyAreas(),
     ...buildOutdoorAreas(town),
     ...buildWorldAreas(),
+    ...buildHomeAreas(town),
   ];
 }

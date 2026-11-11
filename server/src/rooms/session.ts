@@ -32,6 +32,8 @@ export class PlayerSession {
   dayKey = localDayKey(Date.now());
   /** The account this player is signed in as, or null for guests (who save nothing). */
   userId: string | null = null;
+  /** True while a home or street trip is being worked out, so a second request waits for the first. */
+  busy = false;
   /** Players this one has blocked (session ids). */
   readonly blocked = new Set<string>();
 

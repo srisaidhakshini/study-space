@@ -10,6 +10,16 @@ export interface NameplateSource {
   statusText: string | null;
 }
 
+/** A piece of text pinned to a world position (a house sign on the street). */
+export interface WorldLabel {
+  x: number;
+  y: number;
+  text: string;
+  /** CSS colour; defaults to the nameplate cream. */
+  color?: string;
+  visible: boolean;
+}
+
 interface ChatBubble {
   text: Phaser.GameObjects.Text;
   /** Time (scene clock, ms) after which the bubble disappears. */
@@ -35,6 +45,7 @@ const CHAT_WRAP_PX = 170;
  */
 export class OverlayScene extends Phaser.Scene {
   private readonly plates = new Map<NameplateSource, Plate>();
+  private readonly labels = new Map<WorldLabel, Phaser.GameObjects.Text | null>();
 
   constructor() {
     super(SCENES.overlay);
@@ -61,8 +72,20 @@ export class OverlayScene extends Phaser.Scene {
     plate.chat = { text, until: this.time.now + CHAT_SHOW_MS };
   }
 
-  /** Removes every nameplate (the world calls this when it shuts down). */
+  /** Shows a label at a world position until it is removed. Safe to call before this scene runs. */
+  addLabel(label: WorldLabel): void {
+    if (!this.labels.has(label)) this.labels.set(label, null);
+  }
+
+  removeLabel(label: WorldLabel): void {
+    this.labels.get(label)?.destroy();
+    this.labels.delete(label);
+  }
+
+  /** Removes every nameplate and label (the world calls this when it shuts down). */
   clear(): void {
+    for (const text of this.labels.values()) text?.destroy();
+    this.labels.clear();
     for (const plate of this.plates.values()) {
       plate.text?.destroy();
       plate.chat?.text.destroy();
@@ -77,9 +100,21 @@ export class OverlayScene extends Phaser.Scene {
   }
 
   private layout(): void {
-    if (this.plates.size === 0 || !this.scene.isActive(SCENES.world)) return;
+    if ((this.plates.size === 0 && this.labels.size === 0) || !this.scene.isActive(SCENES.world)) return;
     const camera = this.scene.get(SCENES.world).cameras.main;
     const view = camera.worldView;
+    for (const [label, existing] of this.labels) {
+      const text = existing ?? this.createText().setFontSize('12px').setLineSpacing(-3);
+      this.labels.set(label, text);
+      text.setVisible(label.visible);
+      if (!label.visible) continue;
+      if (text.text !== label.text) text.setText(label.text);
+      text.setColor(label.color ?? '#fbf5ea');
+      // Keep the whole label on screen even when its anchor is near an edge.
+      const half = text.width / 2 + 4;
+      const lx = Phaser.Math.Clamp(Math.round((label.x - view.x) * camera.zoom), half, Math.max(half, this.scale.width - half));
+      text.setPosition(lx, Math.round((label.y - view.y) * camera.zoom));
+    }
     for (const [source, plate] of this.plates) {
       const text = plate.text ?? this.createText();
       plate.text = text;

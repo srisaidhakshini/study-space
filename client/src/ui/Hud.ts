@@ -1,9 +1,10 @@
-import { clockMs, DRINK_ZONE_PREFIX, formatClock, getSubject, type TimerState } from '@study/shared';
+import { clockMs, DRINK_ZONE_PREFIX, formatClock, getSubject, type TimerState, type ZoneDef } from '@study/shared';
 import { app } from '../app';
 import { bus } from '../bus';
 import { button, h, setChildren } from './dom';
 import { copyText, getNet, watchNet } from './netAccess';
-import { coinIcon } from './pixelIcon';
+import { visibilityHint, visibilityLabel } from './homeText';
+import { coinIcon, friendsIcon, houseIcon, lockIcon, openDoorIcon } from './pixelIcon';
 import { speakerIcon } from './speakerIcon';
 
 export interface HudActions {
@@ -15,6 +16,7 @@ export interface HudActions {
   openPlayers(): void;
   openDrinkMenu(): void;
   openSettings(): void;
+  openFriends(): void;
 }
 
 function phaseLabel(state: TimerState): string {
@@ -58,6 +60,16 @@ export function createHud(actions: HudActions): HTMLElement {
   const voiceGroup = h('div', { class: 'voice-group' });
   const drinkBtn = button('Order a drink', 'btn btn-small', actions.openDrinkMenu, { title: 'Order a drink at the counter' });
   drinkBtn.hidden = true;
+  const homeBtn = button('Home', 'btn btn-small', () => {
+    const id = app.account.account?.id;
+    if (id) app.homes.visit(id);
+  }, { title: 'Go to your home' });
+  const friendsBtn = button('', 'btn btn-small btn-friends', actions.openFriends, { title: 'Friends', 'aria-label': 'Friends' });
+  const editHomeBtn = button('Edit home', 'btn btn-small', () => app.homes.setEditing(!app.homes.editing), {
+    title: 'Move furniture and decorate your home',
+    'aria-pressed': 'false',
+  });
+  editHomeBtn.hidden = true;
   const dock = h('div', { class: 'dock' });
   const clock = h('div', { class: 'clock', attrs: { role: 'timer' } });
 
@@ -230,6 +242,9 @@ export function createHud(actions: HudActions): HTMLElement {
         coins,
         voiceGroup,
         drinkBtn,
+        editHomeBtn,
+        homeBtn,
+        friendsBtn,
         peopleBtn,
         button('Servers', 'btn btn-small', actions.openServers, { title: 'Choose a server' }),
         button('Wave', 'btn btn-small', () => bus.emit('ui:emote', { name: 'wave' }), { title: 'Wave hello' }),
@@ -241,16 +256,70 @@ export function createHud(actions: HudActions): HTMLElement {
   );
   hud.hidden = true;
 
-  bus.on('location', ({ mapName, zone }) => {
-    hud.hidden = false;
-    drinkBtn.hidden = !zone?.id.startsWith(DRINK_ZONE_PREFIX);
+  let lastLocation: { mapName: string; zone: ZoneDef | null } | null = null;
+  const renderLocation = (): void => {
+    const home = app.homes.info;
+    const street = app.homes.street;
+    if (home) {
+      // Standing in a home: whose it is and who may visit. Visitors see this chip only.
+      setChildren(
+        location,
+        houseIcon(2),
+        h('span', { class: 'location-map' }, home.mine ? 'Your home' : `${home.ownerName}'s home`),
+        h(
+          'span',
+          { class: 'badge badge-visibility', attrs: { title: visibilityHint(home.visibility) } },
+          home.visibility === 'open' ? openDoorIcon(1) : lockIcon(1),
+          visibilityLabel(home.visibility),
+        ),
+      );
+      return;
+    }
+    if (street) {
+      setChildren(location, h('span', { class: 'location-map' }, 'Residential Street'), h('span', { class: 'location-zone' }, `page ${street.page}`));
+      return;
+    }
+    if (!lastLocation) return;
+    const { mapName, zone } = lastLocation;
     setChildren(
       location,
       h('span', { class: 'location-map' }, mapName),
       zone && zone.name !== mapName ? h('span', { class: 'location-zone' }, zone.name) : null,
       zone?.silent ? h('span', { class: 'badge', attrs: { title: 'Chat is off here' } }, 'Silent zone') : null,
     );
+  };
+
+  const renderHomeControls = (): void => {
+    const ready = getNet()?.status === 'online' && app.account.signedIn;
+    homeBtn.disabled = !ready;
+    homeBtn.title = ready ? 'Go to your home' : 'Join a server and sign in to visit homes';
+    const editing = app.homes.editing;
+    editHomeBtn.hidden = !(ready && app.homes.info?.mine);
+    editHomeBtn.textContent = editing ? 'Stop editing' : 'Edit home';
+    editHomeBtn.classList.toggle('active', editing);
+    editHomeBtn.setAttribute('aria-pressed', String(editing));
+    const waiting = app.account.signedIn ? app.friends.incomingCount : 0;
+    setChildren(
+      friendsBtn,
+      friendsIcon(2),
+      h('span', { class: 'btn-label' }, 'Friends'),
+      waiting > 0 ? h('span', { class: 'dot-badge', attrs: { 'aria-hidden': 'true' } }, String(waiting)) : null,
+    );
+    friendsBtn.title = waiting > 0 ? `Friends (${waiting} request${waiting === 1 ? '' : 's'} waiting)` : 'Friends';
+    friendsBtn.setAttribute('aria-label', waiting > 0 ? `Friends, ${waiting} request${waiting === 1 ? '' : 's'} waiting` : 'Friends');
+  };
+
+  bus.on('location', ({ mapName, zone }) => {
+    hud.hidden = false;
+    drinkBtn.hidden = !zone?.id.startsWith(DRINK_ZONE_PREFIX);
+    lastLocation = { mapName, zone };
+    renderLocation();
   });
+  app.homes.changed.subscribe(() => {
+    renderLocation();
+    renderHomeControls();
+  });
+  app.friends.changed.subscribe(renderHomeControls);
   bus.on('seat:near', ({ available }) => {
     if (seatNear === available) return;
     seatNear = available;
@@ -262,6 +331,7 @@ export function createHud(actions: HudActions): HTMLElement {
   });
   app.sessions.changed.subscribe(renderToday);
   app.account.changed.subscribe(renderAccount);
+  app.account.changed.subscribe(renderHomeControls);
   app.account.coinsEarned.subscribe(() => {
     coins.classList.remove('pulse');
     void coins.offsetWidth; // restart the animation if it is already running
@@ -274,10 +344,12 @@ export function createHud(actions: HudActions): HTMLElement {
     renderConnection();
     renderToday();
     renderVoice();
+    renderHomeControls();
   });
   getNet()?.voice.changed.subscribe(renderVoice);
   renderAccount();
   renderToday();
+  renderHomeControls();
   renderDock();
   return hud;
 }

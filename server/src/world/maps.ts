@@ -11,6 +11,8 @@ import {
   type SeatDef,
   type SpawnDef,
 } from '@study/shared';
+import { isDynamicDoor } from '../homes/travel';
+import { HOME_BASE_MAP_IDS, stubBaseMap } from './stubMaps';
 
 /** A map with its objects indexed by id. */
 export interface ServerMap extends ParsedMap {
@@ -59,6 +61,17 @@ function load(): WorldData {
     });
   }
 
+  // The home rooms and the residential street always exist: if the asset
+  // generator has not produced them yet, plain placeholders stand in so the
+  // server logic (and its tests) work either way.
+  for (const id of HOME_BASE_MAP_IDS) {
+    if (maps.has(id)) continue;
+    const stub = stubBaseMap(id);
+    if (!stub) continue;
+    maps.set(id, stub);
+    console.warn(`[maps] "${id}" is not in the asset manifest; using a plain placeholder. Run "npm run assets" once the home maps are generated.`);
+  }
+
   const startMap = maps.get(manifest.start.map);
   const startSpawn = startMap?.spawns.get(manifest.start.spawn);
   if (!startMap || !startSpawn) {
@@ -70,6 +83,8 @@ function load(): WorldData {
   // stopping the server, so content can be added one map at a time.
   for (const map of maps.values()) {
     for (const door of [...map.doors.values()]) {
+      // Street and home doors are resolved by the server at run time; their stored targets are placeholders.
+      if (isDynamicDoor(map.id, door.id)) continue;
       if (maps.get(door.targetMap)?.spawns.has(door.targetSpawn)) continue;
       console.warn(`[maps] Door "${door.id}" in "${map.id}" targets missing spawn "${door.targetMap}/${door.targetSpawn}"; ignoring it.`);
       map.doors.delete(door.id);
