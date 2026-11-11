@@ -1,5 +1,6 @@
 import { Room, ServerError, type Client } from '@colyseus/core';
 import {
+  BUDDIES,
   C2S,
   DOOR_MARGIN,
   DRINK_ZONE_PREFIX,
@@ -13,6 +14,7 @@ import {
   S2C,
   SERVER_TICK_MS,
   SIT_RANGE,
+  STUDY_TOGETHER,
   TILE,
   advanceTimer,
   feetBlocked,
@@ -42,6 +44,9 @@ import { loadStatsMessage, recordServerSession } from '../db/stats';
 import { addReport } from '../moderation/reports';
 import { enqueue, retryOnce } from './persist';
 import { Player, WorldState } from '../schema/PlayerState';
+import { BuddyRoom } from '../studyTogether/BuddyRoom';
+import { QuestionBoards } from '../studyTogether/QuestionBoards';
+import { sharedTree } from '../studyTogether/tree';
 import { getWorld, type ServerMap } from '../world/maps';
 import { sendChat } from './chat';
 import { HomesController } from './homes';
@@ -71,8 +76,11 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
   private readonly sessions = new Map<string, PlayerSession>();
+  private readonly buddies = new BuddyRoom(this.sessions);
+  private readonly boards = new QuestionBoards(this.sessions, () => ({ server: this.serverName, roomId: this.roomId }));
+  private lastTreeMinutes = -1;
   private readonly voice = new VoiceHub(this.sessions);
-  /** Camera sharing between people sitting at study seats. */
+  /** Camera sharing for the room instance. */
   private readonly video = new VoiceHub(this.sessions, VIDEO_CHANNEL);
   /** `${map}:${seatId}` -> session id of whoever sits there. */
   private readonly seats = new Map<string, string>();
@@ -118,6 +126,10 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.onMessage(C2S.homeEnter, (c, m) => this.withSession(c, (s) => void this.homes.enter(s, m)));
     this.onMessage(C2S.homeEdit, (c, m) => this.withSession(c, (s) => this.homes.edit(s, m)));
     this.onMessage(C2S.shopBuy, (c, m) => this.withSession(c, (s) => this.homes.buy(s, m)));
+
+    this.buddies.open();
+    this.onMessage(BUDDIES.action, (c, m) => this.withSession(c, (s) => void this.buddies.action(s, m, serverConfig.now())));
+    this.onMessage(STUDY_TOGETHER.boardAction, (c, m) => this.withSession(c, (s) => this.boards.handle(s, m, serverConfig.now())));
 
     this.clock.setInterval(() => this.tick(), SERVER_TICK_MS);
   }
@@ -197,6 +209,8 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       dir: spawn.facing,
     };
     client.send(S2C.welcome, welcome);
+    client.send(STUDY_TOGETHER.tree, sharedTree().minutes);
+    this.buddies.join(session);
   }
 
   onLeave(client: Client): void {
@@ -208,10 +222,12 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.sessions.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
     this.homes.onLeave(s.player.map);
+    this.buddies.leave(s);
   }
 
-  onDispose(): void {
+  onDispose(): Promise<void> {
     this.homes.dispose();
+    return this.buddies.close();
   }
 
   // ---- accounts ----------------------------------------------------------
@@ -362,7 +378,6 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private stand(s: PlayerSession, now: number, notify: boolean): void {
     if (s.seatKey === null) return;
     this.endTimer(s, now);
-    this.video.leave(s.id);
     this.seats.delete(s.seatKey);
     s.seatKey = null;
     s.player.seatId = '';
@@ -390,9 +405,16 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     });
   }
 
+  private contributeToTree(s: PlayerSession, records: readonly SessionRecord[]): void {
+    if (s.player.map === 'garden' && records.length > 0) {
+      sharedTree().add(records.reduce((sum, record) => sum + record.minutes, 0));
+    }
+  }
+
   /** Ends the running timer now, crediting the whole minutes of focus done. */
   private endTimer(s: PlayerSession, now: number): void {
     if (s.timer.phase === 'idle') return;
+    this.buddies.tick(now);
     this.advance(s, now);
     const { state, record } = stopTimer(s.timer, now);
     s.timer = state;
@@ -401,6 +423,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     if (record) {
       countRecords(s, [record], now);
       s.client.send(S2C.session, { record });
+      this.contributeToTree(s, [record]);
       this.persist(s, [record]);
     }
     s.player.anim = deriveAnim(s, now);
@@ -415,6 +438,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     writeTimer(s.player, s.timer);
     countRecords(s, step.records, now);
     for (const record of step.records) s.client.send(S2C.session, { record });
+    this.contributeToTree(s, step.records);
     this.persist(s, step.records);
     for (const event of step.events) {
       s.client.send(S2C.timerEvent, { event });
@@ -428,6 +452,12 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
 
   private tick(): void {
     const now = serverConfig.now();
+    this.buddies.tick(now);
+    const treeMinutes = sharedTree().minutes;
+    if (treeMinutes !== this.lastTreeMinutes) {
+      this.lastTreeMinutes = treeMinutes;
+      this.broadcast(STUDY_TOGETHER.tree, treeMinutes);
+    }
     for (const s of this.sessions.values()) {
       rollDay(s, now);
       this.advance(s, now);
@@ -496,6 +526,10 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       if (!isPlainObject(raw) || typeof raw.targetId !== 'string' || raw.targetId === s.id) return;
       if (!block) s.blocked.delete(raw.targetId);
       else if (s.blocked.size < MAX_BLOCKED) s.blocked.add(raw.targetId);
+      this.buddies.publishRoster();
+      this.boards.send(s);
+      const target = this.sessions.get(raw.targetId);
+      if (target) this.boards.send(target);
     });
   }
 }

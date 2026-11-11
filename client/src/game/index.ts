@@ -93,6 +93,32 @@ export function createGame(parent: HTMLElement): GameHandle {
   });
   whenSized(parent, () => launch(forced === 'canvas' ? Phaser.CANVAS : Phaser.AUTO));
 
+  // Browser zoom and window resizes can leave the canvas at a stale size (a black
+  // box smaller than the page). Re-measure after the layout settles, and once more
+  // shortly after, because zooming fires several resize events in a row.
+  let resizeFrame = 0;
+  let resizeTimer = 0;
+  const syncSize = (): void => {
+    if (!game?.scale || window.innerWidth < 1 || window.innerHeight < 1) return;
+    try {
+      game.scale.resize(window.innerWidth, window.innerHeight);
+      game.scale.refresh();
+    } catch (error) {
+      console.warn('Resize failed; will retry on the next resize', error);
+    }
+  };
+  const resync = (): void => {
+    window.cancelAnimationFrame(resizeFrame);
+    window.clearTimeout(resizeTimer);
+    resizeFrame = window.requestAnimationFrame(syncSize);
+    resizeTimer = window.setTimeout(syncSize, 250);
+  };
+  window.addEventListener('resize', resync);
+  window.visualViewport?.addEventListener('resize', resync);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) resync();
+  });
+
   // Calls in the same tick (the UI after joining, the net layer after a
   // drop) are merged so the world only restarts once.
   let scheduled = false;

@@ -1,10 +1,23 @@
 import { REPORT_REASON_MAX } from '@study/shared';
 import { app } from '../app';
 import { bus } from '../bus';
+import { buddyPanel, buddyPeerAction } from '../studyTogether/BuddyPanel';
 import type { PlayerInfo } from '../net/types';
 import { button, h, setChildren } from './dom';
 import { openModal } from './modal';
 import { copyText, getNet } from './netAccess';
+
+const localClock = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });
+
+function updateLocalTime(clock: HTMLTimeElement, offset: number, now: number): void {
+  const time = new Date(now + offset * 60_000);
+  const label = localClock.format(time);
+  const text = `Local ${label}`;
+  if (clock.textContent === text) return;
+  clock.dateTime = time.toISOString().slice(11, 16);
+  clock.textContent = text;
+  clock.setAttribute('aria-label', `Local time ${label}`);
+}
 
 type Pending = { id: string; kind: 'block' | 'report' } | null;
 
@@ -27,7 +40,14 @@ export function openPlayers(root: HTMLElement): void {
   let reportDraft = '';
   let unsubscribe: (() => void) | null = null;
 
+  const clocks = new Map<HTMLTimeElement, number>();
+  const updateClocks = (): void => {
+    const now = Date.now();
+    for (const [clock, offset] of clocks) updateLocalTime(clock, offset, now);
+  };
+
   const list = h('div', { class: 'people-list' });
+  const buddies = h('div');
   const inviteLine = h('div', { class: 'row wrap people-invite' });
 
   const reasonInput = h('input', {
@@ -85,6 +105,10 @@ export function openPlayers(root: HTMLElement): void {
 
   const row = (player: PlayerInfo): HTMLElement => {
     const net = getNet();
+    const clock = Number.isFinite(player.tzOffsetMin)
+      ? h('time', { class: 'hint', attrs: { title: `${player.name}’s local time` } })
+      : null;
+    if (clock) clocks.set(clock, player.tzOffsetMin);
     return h(
       'div',
       { class: 'people-row' },
@@ -96,6 +120,7 @@ export function openPlayers(root: HTMLElement): void {
           { class: 'people-who' },
           h('strong', { class: 'people-name' }, player.name),
           h('span', { class: 'hint' }, mapName(player.map)),
+          clock,
           voiceBadge(player.id),
           player.muted ? h('span', { class: 'badge' }, 'Muted') : null,
           player.blocked ? h('span', { class: 'badge' }, 'Blocked') : null,
@@ -103,6 +128,7 @@ export function openPlayers(root: HTMLElement): void {
         h(
           'div',
           { class: 'people-buttons' },
+          buddyPeerAction(player),
           button(player.muted ? 'Unmute' : 'Mute', 'btn btn-small', () =>
             player.muted ? net?.unmute(player.id) : net?.mute(player.id),
           ),
@@ -132,6 +158,7 @@ export function openPlayers(root: HTMLElement): void {
           })
         : null,
     );
+    clocks.clear();
     setChildren(
       list,
       players.length === 0
@@ -139,6 +166,8 @@ export function openPlayers(root: HTMLElement): void {
         : null,
       ...players.map(row),
     );
+    updateClocks();
+    buddies.replaceChildren(buddyPanel());
     if (hadFocus && pending?.kind === 'report') reasonInput.focus();
   }
 
@@ -150,6 +179,7 @@ export function openPlayers(root: HTMLElement): void {
       h('h2', { class: 'panel-title' }, 'People here'),
       inviteLine,
       list,
+      buddies,
       h('div', { class: 'panel-actions' }, button('Close', 'btn', () => close())),
     ),
     () => close(),
@@ -161,11 +191,15 @@ export function openPlayers(root: HTMLElement): void {
     modal.close();
   }
 
+  const clockTimer = window.setInterval(updateClocks, 1000);
   const offNet = getNet()?.changed.subscribe(render);
+  const offBuddies = app.net.buddiesChanged.subscribe(render);
   const offVoice = getNet()?.voice.changed.subscribe(render);
   unsubscribe = () => {
+    window.clearInterval(clockTimer);
     offNet?.();
     offVoice?.();
+    offBuddies();
   };
   render();
 }

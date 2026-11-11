@@ -59,15 +59,12 @@ export const VOICE_CHANNEL: HubChannel = {
   signal: S2C.voiceSignal,
 };
 
-/** Video is only for people sitting at a study seat, and only between people in the same place. */
+/** Video works like voice: anyone in the room, whatever they are doing or wherever they are. */
 export const VIDEO_CHANNEL: HubChannel = {
   peers: S2C.videoPeers,
   joined: S2C.videoPeerJoined,
   left: S2C.videoPeerLeft,
   signal: S2C.videoSignal,
-  canJoin: (who) => who.seatKey !== null,
-  denied: 'Sit down at a study desk to start your camera.',
-  together: (a, b) => a.player.map === b.player.map,
   label: 'video room',
 };
 

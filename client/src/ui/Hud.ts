@@ -8,6 +8,7 @@ import { coinIcon, friendsIcon, houseIcon, lockIcon, openDoorIcon } from './pixe
 import { speakerIcon } from './speakerIcon';
 
 export interface HudActions {
+  studyTools: HTMLElement;
   openAccount(): void;
   openStats(): void;
   openCreator(): void;
@@ -173,7 +174,7 @@ export function createHud(actions: HudActions): HTMLElement {
 
   const renderDock = (): void => {
     const state = app.timer.state;
-    dock.className = `dock dock-${state.phase}`;
+    dock.className = `dock dock-${state.phase}${confirmingStand ? ' dock-confirm' : ''}`;
 
     if (!app.timer.seated) {
       confirmingStand = false;
@@ -216,9 +217,8 @@ export function createHud(actions: HudActions): HTMLElement {
     updateClock();
     setChildren(
       dock,
-      h('div', { class: 'phase' }, phaseLabel(state)),
+      h('div', { class: 'dock-info' }, h('div', { class: 'phase' }, phaseLabel(state)), h('div', { class: 'cycle' }, cycleLabel(state))),
       clock,
-      h('div', { class: 'cycle' }, cycleLabel(state)),
       h(
         'div',
         { class: 'row' },
@@ -246,6 +246,7 @@ export function createHud(actions: HudActions): HTMLElement {
         homeBtn,
         friendsBtn,
         peopleBtn,
+        actions.studyTools,
         button('Servers', 'btn btn-small', actions.openServers, { title: 'Choose a server' }),
         button('Wave', 'btn btn-small', () => bus.emit('ui:emote', { name: 'wave' }), { title: 'Wave hello' }),
         button('Character', 'btn btn-small', actions.openCreator, { title: 'Edit your character' }),

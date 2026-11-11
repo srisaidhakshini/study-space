@@ -25,6 +25,9 @@ model User {
   createdAt    DateTime @default(now())
   lastLoginAt  DateTime @default(now())
 
+  buddyPairsFirst  BuddyPair[] @relation("BuddyFirst")
+  buddyPairsSecond BuddyPair[] @relation("BuddySecond")
+
   sessions     StudySession[]
   transactions CoinTransaction[]
   home         Home?
@@ -140,4 +143,29 @@ model Friendship {
 
   @@unique([requesterId, addresseeId])
   @@index([addresseeId])
+}
+
+model BuddyPair {
+  id               String    @id @default(cuid())
+  firstId          String
+  secondId         String
+  requestedByFirst Boolean
+  acceptedAt       DateTime?
+
+  first   User         @relation("BuddyFirst", fields: [firstId], references: [id], onDelete: Cascade)
+  second  User         @relation("BuddySecond", fields: [secondId], references: [id], onDelete: Cascade)
+  periods BuddyFocus[]
+
+  @@unique([firstId, secondId])
+  @@index([secondId])
+}
+
+model BuddyFocus {
+  id         String @id
+  pairId     String
+  durationMs Int
+
+  pair BuddyPair @relation(fields: [pairId], references: [id], onDelete: Cascade)
+
+  @@index([pairId])
 }

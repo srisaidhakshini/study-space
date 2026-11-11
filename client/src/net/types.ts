@@ -14,6 +14,7 @@ export interface PlayerInfo {
   id: string;
   name: string;
   map: string;
+  tzOffsetMin: number;
   muted: boolean;
   blocked: boolean;
 }
@@ -31,7 +32,7 @@ export interface NetApi {
   readonly welcome: WelcomeMessage | null;
   /** Voice call with the others in the room. */
   readonly voice: VoiceApi;
-  /** Camera sharing for people seated at study desks. */
+  /** Camera sharing with the others in the room. */
   readonly video: VideoApi;
 
   /** Lists the named servers with live player counts. Throws a readable Error on failure. */

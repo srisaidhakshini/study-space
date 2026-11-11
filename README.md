@@ -3,12 +3,7 @@
 A cozy pixel-art world for studying together: walk around as a chibi
 character, sit at a desk, and run a focus timer that floats above your head.
 
-**Status: phases 1–4 of 7, plus voice and video** — multiplayer (Colyseus
-server, synced movement, server-side timers, chat rules), nine places with
-their own ambience and lo-fi music, a day/night cycle with weather, accounts
-(Postgres via Prisma: look, history, streaks and focus coins), WebRTC voice
-calls and study-desk video, and a one-host deployment path. Player homes with a furniture shop, edit mode and friends are in.
-The shared tree growth, buddy desks and final polish come next.
+**Status: phases 1–6 of 7, plus voice and video.** Study Space has multiplayer, nine public maps, accounts and focus stats, player homes with a furniture shop, and room-wide WebRTC calls. Phase 6 adds the shared Garden tree, Library buddy desks, private buddy trees, player local times, the focus ghost, and subject question boards. See [Phase 6 features](docs/PHASE6.md).
 
 ## Run it
 
@@ -99,7 +94,7 @@ whole minutes you studied.
 - If WebGL fails to start the game falls back to the Canvas renderer
   automatically (force it with `?renderer=canvas`).
 
-## Voice and study-desk video
+## Voice and video
 
 Both run peer to peer over WebRTC; the game server only relays the signalling.
 
@@ -107,10 +102,7 @@ Both run peer to peer over WebRTC; the game server only relays the signalling.
   "Mic on / Mic muted" toggles your microphone, "Leave voice" ends it. Muted
   and blocked players are never connected to you, and the People list shows who
   is in the call.
-- **Study-desk video** ("Start camera", shown while you are seated): share your
-  camera with the other players seated at study desks on the same map. Standing
-  up, changing map or leaving removes you automatically. "Pause camera" turns
-  the picture off without leaving.
+- **Video** ("Start camera"): share your camera with other players in the same room instance. Click a feed to expand the call to full screen. "Pause camera" turns off your picture while you stay connected. "Stop video" leaves the video call.
 - Browsers ask permission for the microphone and camera the first time. Nothing
   is recorded or stored.
 - Behind strict networks a TURN relay is needed. Set `TURN_HOST` and
@@ -137,7 +129,7 @@ Every account has a private room, reached from the **Home** button or from its
 door on the residential street (west end of the town road). **Edit** lets you
 place, move, rotate and remove furniture on the grid; the shop sells furniture,
 wallpapers and floors for focus coins, which you only earn by finishing study
-sessions. You can upgrade the room twice (14�8 for 600 coins, 18�10 for 1800),
+sessions. You can upgrade the room twice (14×8 for 600 coins, 18×10 for 1800),
 set it to private, friends-only or open, and study at your home desk. Add
 friends from the **Friends** button, then visit them from the list. Details in
 [docs/HOMES.md](docs/HOMES.md).

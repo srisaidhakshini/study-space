@@ -14,6 +14,7 @@ import {
 } from '@study/shared';
 import { app } from '../../app';
 import { bus } from '../../bus';
+import { StudyWorld } from '../../studyTogether/StudyWorld';
 import { Character } from '../character/Character';
 import { Pet } from '../character/Pet';
 import { DEPTH, SCENES } from '../depths';
@@ -81,6 +82,7 @@ export class WorldScene extends Phaser.Scene {
   private target: WorldInit = { map: '', spawn: '' };
   private map!: LoadedMap;
   private seats!: Seats;
+  private studyWorld: StudyWorld | null = null;
   private lamps!: Lamps;
   /** Day, night, weather and street lamps; outdoor maps only. */
   private sky: Sky | null = null;
@@ -175,6 +177,7 @@ export class WorldScene extends Phaser.Scene {
     if (!this.scene.isActive(SCENES.overlay)) this.scene.launch(SCENES.overlay);
     this.overlay = this.scene.get(SCENES.overlay) as OverlayScene;
     this.overlay.track(this.player);
+    this.studyWorld = new StudyWorld(this, this.map, this.seats);
     this.remotes = new RemotePlayers(this, this.overlay, this.seats, this.map.id);
     if (homeInfo !== null) {
       this.homeView = new HomeView(this, this.map.grid, this.seats);
@@ -188,7 +191,6 @@ export class WorldScene extends Phaser.Scene {
       this.sky = new Sky(this, this.map.widthPx, this.map.heightPx, this.map.objects.lights, () => this.overlay);
     }
 
-    this.setupCamera();
     this.setupInput();
     this.cleanup = [
       bus.on('ui:sit', () => this.whenFree(() => this.controller.sitNearest())),
@@ -210,6 +212,7 @@ export class WorldScene extends Phaser.Scene {
         if (source) this.overlay.say(source, line.text);
       }),
     ];
+    this.setupCamera();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shutdown());
 
     this.zone = zoneAt(this.map.objects.zones, this.player.x, this.player.y);
@@ -256,6 +259,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.update(dt);
     this.pet?.update(dt, this.player.x, this.player.y);
     this.remotes.update(dt);
+    if (!this.travelling) this.studyWorld?.update(dt);
     this.sky?.update(dt);
     this.homeView?.update(dt);
     this.editor?.update();
@@ -300,7 +304,11 @@ export class WorldScene extends Phaser.Scene {
 
   private setupCamera(): void {
     const camera = this.cameras.main;
-    const fit = (): void => this.refitCamera();
+    const fit = (): void => {
+      const status = this.sys.settings.status;
+      if (status === Phaser.Scenes.SHUTDOWN || status === Phaser.Scenes.DESTROYED || !this.cameras?.main) return;
+      this.refitCamera();
+    };
     fit();
     camera.setRoundPixels(true);
     camera.startFollow(this.player, true, 0.2, 0.2);
@@ -529,6 +537,8 @@ export class WorldScene extends Phaser.Scene {
     this.editor = null;
     this.street?.destroy();
     this.street = null;
+    this.studyWorld?.destroy();
+    this.studyWorld = null;
     this.overlay.clear();
     this.pet = null;
     this.petId = '';

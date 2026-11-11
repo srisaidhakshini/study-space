@@ -1,0 +1,45 @@
+.panel.people {
+  max-height: 85dvh;
+  overflow-y: auto;
+}
+
+.people-buddies {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid currentColor;
+}
+
+.people-buddies :is(h3, p) {
+  margin: 0;
+}
+
+.buddy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.buddy-tree {
+  justify-content: flex-start;
+}
+
+.buddy-tree-icon {
+  font-size: 2rem;
+}
+
+.buddy-tree-details {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.buddy-tree-details > :is(.badge, button) {
+  margin-inline-start: 0.4rem;
+}
+
+.buddy-tree-details progress {
+  width: min(10rem, 100%);
+}

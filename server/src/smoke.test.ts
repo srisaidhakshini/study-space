@@ -18,7 +18,6 @@ import {
   type Direction,
   type JoinOptions,
   type JoinResponse,
-  type NoticeMessage,
   type PlayerSnapshot,
   type ServerListResponse,
   type SitResultMessage,
@@ -271,18 +270,19 @@ async function main(): Promise<void> {
     const library = world.maps.get('library')!;
     const seat = library.objects.seats.filter((s) => s.facing === 'up').sort((p, q) => Math.hypot(p.tx * TILE - a.x, p.ty * TILE - a.y) - Math.hypot(q.tx * TILE - a.x, q.ty * TILE - a.y))[0]!;
     await a.walkToTile('library', seat.tx, seat.ty + 1);
-    // (k) video is only for people sitting at a study desk
-    a.room.send(C2S.videoJoin);
-    check(
-      '(k) a standing player cannot join the video room',
-      await until(() => a.messages<NoticeMessage>(S2C.notice).some((m) => m.text.includes('Sit down'))) && a.messages(S2C.videoPeers).length === 0,
-    );
     a.room.send(C2S.sit, { seatId: seat.id });
     check('(f) sitting on a nearby free seat works', await until(() => a.messages<SitResultMessage>(S2C.sitResult).some((r) => r.ok && r.seatId === seat.id)));
     check('(f) the seat is recorded in synced state', await until(() => a.snapshot()?.seatId === seat.id && a.snapshot()?.anim === 'sit'));
 
+    // (k) video works like voice: open to everyone in the room, seated or not, in any map
+    b.room.send(C2S.unblock, { targetId: a.id }); // (b blocked a for the chat checks above)
     a.room.send(C2S.videoJoin);
-    check('(k) a seated player joins the video room', await until(() => a.messages<VoicePeersMessage>(S2C.videoPeers).some((m) => m.ids.length === 0)));
+    check('(k) a player joins the video room while seated', await until(() => a.messages<VoicePeersMessage>(S2C.videoPeers).some((m) => m.ids.length === 0)));
+    b.room.send(C2S.videoJoin);
+    check('(k) a standing player in another map joins too', await until(() => b.messages<VoicePeersMessage>(S2C.videoPeers).some((m) => m.ids.includes(a.id))));
+    check('(k) the seated player hears about the joiner', await until(() => a.messages<VoicePeerMessage>(S2C.videoPeerJoined).some((m) => m.id === b.id)));
+    b.room.send(C2S.videoLeave);
+    b.room.send(C2S.block, { targetId: a.id });
     // timers and the silent zone
     a.room.send(C2S.chat, { text: 'psst' });
     check('(f) chat is denied in the silent library', await until(() => a.messages<{ reason: string }>(S2C.chatDenied).some((m) => m.reason === 'silent')));
@@ -295,8 +295,6 @@ async function main(): Promise<void> {
     a.room.send(C2S.timerStop, {});
     check('(f) stopping returns the timer to idle', await until(() => a.snapshot()?.phase === 'idle'));
     a.room.send(C2S.stand, {});
-    a.room.send(C2S.videoJoin);
-    check('(k) standing up removes you from the video room', await until(() => a.messages<NoticeMessage>(S2C.notice).filter((m) => m.text.includes('Sit down')).length === 2));
     check('(f) standing up teleports back and frees the seat', await until(() => a.messages<TeleportMessage>(S2C.teleport).some((t) => t.reason === 'stand') && a.snapshot()?.seatId === ''));
     check('(f) a timer cannot start while standing', (a.room.send(C2S.timerStart, { mode: 'pomodoro', focusMin: 25, breakMin: 5, autoRepeat: false, subject: 'math' }), await sleep(300), a.snapshot()?.phase === 'idle'));
 

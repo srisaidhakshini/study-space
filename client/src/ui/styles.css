@@ -326,6 +326,42 @@ canvas {
   background: #e4efc9;
 }
 
+/* While a timer runs the dock is a slim bar: label, clock and buttons in one row. */
+.dock-focus,
+.dock-break {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  max-width: min(96vw, 560px);
+  padding: 6px 12px 8px;
+}
+
+.dock-focus.dock-confirm,
+.dock-break.dock-confirm {
+  flex-direction: column;
+  padding: 8px 18px 12px;
+}
+
+.dock-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dock-info .phase {
+  font-size: 13px;
+}
+
+.dock-info .cycle {
+  font-size: 12px;
+}
+
+.dock-focus .clock,
+.dock-break .clock {
+  font-size: 34px;
+}
+
 .phase {
   font-size: 16px;
   font-weight: 600;
@@ -1497,17 +1533,48 @@ canvas {
   pointer-events: auto;
 }
 
+.video-dock {
+  --tw: 240px;
+  --th: 180px;
+  --cols: 1;
+}
+
+/* One column of big tiles for a pair or a trio, two columns of smaller ones for more. */
+.video-dock[data-count='2'] {
+  --tw: 320px;
+  --th: 240px;
+}
+.video-dock[data-count='3'] {
+  --tw: 260px;
+  --th: 195px;
+}
+.video-dock[data-count='4'],
+.video-dock[data-count='5'],
+.video-dock[data-count='6'] {
+  --tw: 200px;
+  --th: 150px;
+  --cols: 2;
+}
+.video-dock[data-count='7'],
+.video-dock[data-count='8'] {
+  --tw: 160px;
+  --th: 120px;
+  --cols: 2;
+}
+
 .video-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--tw));
   gap: 6px;
+  max-height: calc(100vh - 170px);
+  overflow-y: auto;
 }
 
 .video-tile {
   position: relative;
-  width: 128px;
-  height: 96px;
+  width: var(--tw);
+  height: var(--th);
+  max-width: 44vw;
   background: var(--ink);
   border: 3px solid var(--ink);
   border-radius: 6px;
@@ -1546,4 +1613,64 @@ canvas {
 .video-controls {
   display: flex;
   gap: 6px;
+}
+
+.video-root {
+  display: contents;
+}
+
+.video-tile {
+  cursor: zoom-in;
+}
+
+.video-big {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.88);
+  pointer-events: auto;
+}
+
+.video-big-close {
+  position: absolute;
+  top: calc(18px + env(safe-area-inset-top));
+  right: 18px;
+  z-index: 1;
+}
+
+/* Every tile shares the whole screen: 1x1, 2 side by side, 2x2, 3x2, 3x3. */
+.video-big-grid {
+  --cols: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-auto-rows: 1fr;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+.video-big-grid[data-count='2'],
+.video-big-grid[data-count='3'],
+.video-big-grid[data-count='4'] {
+  --cols: 2;
+}
+.video-big-grid[data-count='5'],
+.video-big-grid[data-count='6'],
+.video-big-grid[data-count='7'],
+.video-big-grid[data-count='8'],
+.video-big-grid[data-count='9'] {
+  --cols: 3;
+}
+
+.video-big-grid .video-tile {
+  width: auto;
+  height: auto;
+  max-width: none;
+  min-height: 0;
+  cursor: default;
+}
+
+.video-big-grid .video-name {
+  font-size: 14px;
+  padding: 3px 8px;
 }

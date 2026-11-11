@@ -6,6 +6,7 @@ import {
   parseMapObjects,
   TILE,
   TILE_PROP_SORT_OFFSET,
+  TREE_PLOT,
   type CollisionGrid,
   type MapEntry,
   type MapObjects,
@@ -24,12 +25,14 @@ export interface LoadedMap {
   heightPx: number;
   grid: CollisionGrid;
   objects: MapObjects;
+  treeTiles: Phaser.GameObjects.Image[];
 }
 
 /** Turns every furniture tile into its own image so it can depth-sort with characters. */
-function buildFurniture(scene: Phaser.Scene, map: Phaser.Tilemaps.Tilemap, entry: MapEntry): void {
+function buildFurniture(scene: Phaser.Scene, map: Phaser.Tilemaps.Tilemap, entry: MapEntry, id: string): Phaser.GameObjects.Image[] {
+  const treeTiles: Phaser.GameObjects.Image[] = [];
   const layer = map.getLayer(LAYERS.furniture);
-  if (!layer) return;
+  if (!layer) return treeTiles;
   for (const row of layer.data) {
     for (const tile of row) {
       if (!tile || tile.index <= 0) continue;
@@ -39,12 +42,17 @@ function buildFurniture(scene: Phaser.Scene, map: Phaser.Tilemaps.Tilemap, entry
       if (!texture) continue;
       const props = tileset.getTileProperties(tile.index) as Record<string, unknown> | null | undefined;
       const sortOffset = Number(props?.[TILE_PROP_SORT_OFFSET] ?? 0) || 0;
-      scene.add
+      const image = scene.add
         .image(tile.x * TILE, tile.y * TILE, texture, tile.index - tileset.firstgid)
         .setOrigin(0, 0)
         .setDepth((tile.y + 1 + sortOffset) * TILE);
+      const { x, y, size } = TREE_PLOT;
+      if (id === 'garden' && tile.x >= x && tile.x < x + size && tile.y >= y && tile.y < y + size) {
+        treeTiles.push(image);
+      }
     }
   }
+  return treeTiles;
 }
 
 function buildGrid(map: Phaser.Tilemaps.Tilemap): CollisionGrid {
@@ -84,7 +92,7 @@ export function loadMap(scene: Phaser.Scene, id: string, homeTier = 1): LoadedMa
     if (map.getLayerIndex(name) === null) continue;
     map.createLayer(name, tilesets, 0, 0)?.setDepth(depth);
   }
-  buildFurniture(scene, map, entry);
+  const treeTiles = buildFurniture(scene, map, entry, id);
 
   const raw = (map.getObjectLayer(LAYERS.objects)?.objects ?? []) as unknown as RawTiledObject[];
   const widthPx = map.widthInPixels;
@@ -99,7 +107,7 @@ export function loadMap(scene: Phaser.Scene, id: string, homeTier = 1): LoadedMa
       .setDepth(DEPTH.ambient);
   }
 
-  return { id, baseId, entry, widthPx, heightPx, grid: buildGrid(map), objects: parseMapObjects(raw) };
+  return { id, baseId, entry, widthPx, heightPx, grid: buildGrid(map), objects: parseMapObjects(raw), treeTiles };
 }
 
 /**
@@ -110,9 +118,15 @@ export function fitCamera(camera: Phaser.Cameras.Scene2D.Camera, viewW: number, 
   // A home is one small room: zoom in until it fills most of the view, leaving
   // room for the edit panels around it. Other maps use a fixed field of view.
   const room = map.baseId.startsWith('home_');
-  const zoom = room
+  const base = Phaser.Math.Clamp(Math.floor(Math.min(viewW / 480, viewH / 300)), 2, 6);
+  let zoom = room
     ? Phaser.Math.Clamp(Math.floor(Math.min((viewW * 0.72) / map.widthPx, (viewH * 0.78) / map.heightPx)), 2, 6)
-    : Phaser.Math.Clamp(Math.floor(Math.min(viewW / 480, viewH / 300)), 2, 6);
+    : base;
+  if (!room) {
+    for (let candidate = base + 1; candidate <= 6; candidate++) {
+      if (map.widthPx * candidate <= viewW && map.heightPx * candidate <= viewH * 1.25) zoom = candidate;
+    }
+  }
   camera.setSize(viewW, viewH);
   camera.setZoom(zoom);
   const visibleW = viewW / zoom;

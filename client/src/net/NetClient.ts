@@ -1,9 +1,15 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
+  BUDDIES,
   C2S,
+  type BuddyAction,
+  type BuddyLinks,
   CHAT_MAX_LENGTH,
   REPORT_REASON_MAX,
   S2C,
+  STUDY_TOGETHER,
+  type BoardAction,
+  type QuestionBoardSnapshot,
   type ApiError,
   type BlockMessage,
   type ChatDeniedMessage,
@@ -83,6 +89,12 @@ function describe(error: unknown): string {
  */
 export class NetClient implements NetApi {
   readonly changed = new Emitter();
+  readonly buddiesChanged = new Emitter();
+  buddies: BuddyLinks = { links: [], online: {} };
+  buddyCandidates: ReadonlySet<string> = new Set();
+  readonly questionBoard = new Emitter<QuestionBoardSnapshot>();
+  readonly treeChanged = new Emitter();
+  treeMinutes = 0;
   /** Fires after every state patch from the server (about 10 times a second). */
   readonly patched = new Emitter();
   readonly teleports = new Emitter<TeleportMessage>();
@@ -197,7 +209,14 @@ export class NetClient implements NetApi {
 
   players(): PlayerInfo[] {
     const out: PlayerInfo[] = [];
-    this.eachPeer((p) => out.push({ id: p.id, name: p.name, map: p.map, muted: this.muted.has(p.id), blocked: this.blocked.has(p.id) }));
+    this.eachPeer((p) => out.push({
+      id: p.id,
+      name: p.name,
+      map: p.map,
+      tzOffsetMin: p.tz,
+      muted: this.muted.has(p.id),
+      blocked: this.blocked.has(p.id),
+    }));
     return out;
   }
 
@@ -259,6 +278,11 @@ export class NetClient implements NetApi {
     return out;
   }
 
+  visiblePeer(id: string): PlayerSnapshot | null {
+    if (id === this.selfId || this.muted.has(id) || this.blocked.has(id)) return null;
+    return this.room?.state?.players?.get(id) ?? null;
+  }
+
   /** Converts a server timestamp to this computer's clock. */
   toLocalTime(serverMs: number): number {
     return serverMs - this.skewMs;
@@ -296,6 +320,14 @@ export class NetClient implements NetApi {
     this.send<ShopBuyMessage>(C2S.shopBuy, { itemId, quantity });
   }
 
+  sendBuddyAction(action: BuddyAction): void {
+    this.send(BUDDIES.action, action);
+  }
+
+  sendBoardAction(action: BoardAction): void {
+    this.send(STUDY_TOGETHER.boardAction, action);
+  }
+
   // ---- Internals ---------------------------------------------------------
 
   /** STUN/TURN servers for a voice call, from the game server. Null if it cannot be reached. */
@@ -311,6 +343,10 @@ export class NetClient implements NetApi {
   private setStatus(status: NetStatus): void {
     if (this.status === status) return;
     this.status = status;
+    if (status !== 'online') {
+      this.treeMinutes = 0;
+      this.treeChanged.emit();
+    }
     this.changed.emit();
   }
 
@@ -375,6 +411,9 @@ export class NetClient implements NetApi {
     this.roster = '';
     this.muted.clear();
     this.blocked.clear();
+    this.buddies = { links: [], online: {} };
+    this.buddyCandidates = new Set();
+    this.buddiesChanged.emit();
     this.voice.reset();
     this.video.reset();
     if (room) room.removeAllListeners();
@@ -387,6 +426,22 @@ export class NetClient implements NetApi {
     room.reconnection.enabled = false;
 
     const welcome = new Promise<WelcomeMessage>((resolve) => room.onMessage(S2C.welcome, (m: WelcomeMessage) => resolve(m)));
+    room.onMessage(BUDDIES.links, (view: BuddyLinks) => {
+      if (this.room !== room) return;
+      this.buddies = view;
+      this.buddiesChanged.emit();
+    });
+    room.onMessage(BUDDIES.candidates, (ids: string[]) => {
+      if (this.room !== room) return;
+      this.buddyCandidates = new Set(ids);
+      this.buddiesChanged.emit();
+    });
+    room.onMessage(STUDY_TOGETHER.board, (message: QuestionBoardSnapshot) => this.questionBoard.emit(message));
+    room.onMessage(STUDY_TOGETHER.tree, (minutes: number) => {
+      if (!Number.isSafeInteger(minutes) || minutes < 0 || this.room !== room) return;
+      this.treeMinutes = minutes;
+      this.treeChanged.emit();
+    });
     room.onMessage(S2C.teleport, (m: TeleportMessage) => this.teleports.emit(m));
     room.onMessage(S2C.correct, (m: CorrectMessage) => this.corrections.emit(m));
     room.onMessage(S2C.sitResult, (m: SitResultMessage) => this.sitResults.emit(m));

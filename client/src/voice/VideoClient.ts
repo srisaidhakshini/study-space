@@ -50,9 +50,8 @@ interface Peer {
 }
 
 /**
- * Camera sharing for people sitting at study desks: a full video mesh, like
- * the voice call but video only and separate from it. The server only lets
- * seated players in the same place join, and removes you when you stand up.
+ * Camera sharing for everyone in the room: a full video mesh, like the voice
+ * call but video only and separate from it.
  */
 export class VideoClient implements VideoApi {
   readonly changed = new Emitter();

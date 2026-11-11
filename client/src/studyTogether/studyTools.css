@@ -1,0 +1,76 @@
+.study-tools {
+  display: contents;
+}
+
+.study-desk-status {
+  white-space: nowrap;
+}
+
+.study-together {
+  width: min(36rem, 100%);
+  overflow: auto;
+  max-height: 85dvh;
+}
+
+.study-together .panel-head,
+.study-board-form,
+.study-board-controls,
+.study-section,
+.study-question {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.study-together .panel-head {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.study-section + .study-section {
+  border-top: 1px solid currentColor;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.study-section :is(h3, p) {
+  margin: 0;
+}
+
+.study-section progress {
+  width: 100%;
+}
+
+.study-questions {
+  display: grid;
+  gap: 0.8rem;
+  max-height: 35dvh;
+  overflow: auto;
+}
+
+.study-post {
+  overflow-wrap: anywhere;
+}
+
+.study-answer {
+  border-left: 2px solid currentColor;
+  margin-left: 0.5rem;
+  padding-left: 0.6rem;
+}
+
+.study-board-form textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.study-ghost-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.study-board-controls {
+  min-inline-size: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
