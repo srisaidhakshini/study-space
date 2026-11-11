@@ -62,7 +62,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
   private readonly sessions = new Map<string, PlayerSession>();
   private readonly voice = new VoiceHub(this.sessions);
-  /** Camera sharing between people sitting at study seats. */
+  /** Camera sharing, open to everyone in the room like voice. */
   private readonly video = new VoiceHub(this.sessions, VIDEO_CHANNEL);
   /** `${map}:${seatId}` -> session id of whoever sits there. */
   private readonly seats = new Map<string, string>();
@@ -256,7 +256,6 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private stand(s: PlayerSession, now: number, notify: boolean): void {
     if (s.seatKey === null) return;
     this.endTimer(s, now);
-    this.video.leave(s.id);
     this.seats.delete(s.seatKey);
     s.seatKey = null;
     s.player.seatId = '';
