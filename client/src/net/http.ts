@@ -6,6 +6,7 @@ export const UNREACHABLE = "Can't reach the server. Is it running?";
 export function serverBase(): string {
   const configured = import.meta.env.VITE_SERVER_URL as string | undefined;
   if (configured) return configured.replace(/\/+$/, '');
+  if (import.meta.env.PROD) return location.origin;
   const scheme = location.protocol === 'https:' ? 'https' : 'http';
   return `${scheme}://${location.hostname}:${SERVER_PORT}`;
 }

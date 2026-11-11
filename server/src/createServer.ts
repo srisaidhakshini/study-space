@@ -2,6 +2,9 @@ import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import cors from 'cors';
 import express from 'express';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { MAX_PLAYERS_PER_ROOM, ROOM_NAME, type ApiError } from '@study/shared';
 import { registerAccountRoutes } from './api/accountRoutes';
 import { registerRoutes } from './api/routes';
@@ -45,6 +48,11 @@ export function createServer(settings: ServerSettings = {}): GameServer {
       app.use(express.json({ limit: '4kb' }));
       registerRoutes(app);
       registerAccountRoutes(app);
+      // Serve the built game and its websocket/API from one public origin.
+      const clientDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
+      if (existsSync(resolve(clientDir, 'index.html'))) {
+        app.use(express.static(clientDir));
+      }
       // Malformed JSON bodies get a JSON error like every other failure.
       app.use((_err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
         const body: ApiError = { error: 'Invalid request' };

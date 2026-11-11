@@ -124,6 +124,17 @@ whole minutes you studied.
   (the library, study benches) and while your own focus timer runs. Emotes are
   always allowed. You can mute, block and report from the People panel.
 
+## Deploying on one host
+
+For a single-host deployment, run `npm run build`, set `NODE_ENV=production`
+and a random `AUTH_SECRET` of at least 32 characters, then run
+`npm start -w server`. The server serves `client/dist` as well as the API and
+WebSocket on `PORT` (default 2567). Use a host/reverse proxy that supports
+long-lived WebSockets and a single server instance. `VITE_SERVER_URL` is only
+needed when the frontend is hosted separately. A temporary Cloudflare Tunnel
+to `http://localhost:2567` can share the running server; the laptop and tunnel
+must stay running, and the URL changes when the tunnel restarts.
+
 ## Layout
 
 ```
