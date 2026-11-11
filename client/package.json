@@ -1,0 +1,23 @@
+{
+  "name": "@study/client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@colyseus/sdk": "^0.18.9",
+    "@fontsource/pixelify-sans": "^5.1.0",
+    "@fontsource/press-start-2p": "^5.3.0",
+    "@study/shared": "*",
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}
