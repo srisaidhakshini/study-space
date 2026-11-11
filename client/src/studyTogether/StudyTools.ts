@@ -1,6 +1,7 @@
 import {
   hasQuestionBoard,
   QUESTION_LIMIT,
+  SUBJECTS,
   TREE_STAGES,
   treeStage,
   type BoardPost,
@@ -15,6 +16,7 @@ import './studyTools.css';
 
 export function createStudyTools(root: HTMLElement): HTMLElement {
   let map = '';
+  let locationSubject = '';
   let closePanel: (() => void) | null = null;
   const study = button('Study together', 'btn btn-small', () => open());
   study.hidden = true;
@@ -27,9 +29,10 @@ export function createStudyTools(root: HTMLElement): HTMLElement {
   const updateVisibility = (): void => {
     study.hidden = map !== 'garden' && map !== 'library' && !(app.net.online && hasQuestionBoard(map));
   };
-  bus.on('location', ({ mapId }) => {
+  bus.on('location', ({ mapId, zone }) => {
     if (mapId !== map) closePanel?.();
     map = mapId;
+    locationSubject = zone?.subject ?? '';
     updateVisibility();
   });
   app.net.changed.subscribe(updateVisibility);
@@ -63,7 +66,7 @@ export function createStudyTools(root: HTMLElement): HTMLElement {
     if (openedMap === 'library') panel.append(libraryTools());
     if (app.net.online && hasQuestionBoard(openedMap)) {
       off.push(() => app.net.sendBoardAction({ kind: 'close' }));
-      panel.append(questionBoard(openedMap, off));
+      panel.append(questionBoard(openedMap, locationSubject, off));
       off.push(app.net.changed.subscribe(() => {
         if (!app.net.online) close();
       }));
@@ -105,13 +108,20 @@ function libraryTools(): HTMLElement {
   );
 }
 
-function questionBoard(map: string, off: (() => void)[]): HTMLElement {
+function questionBoard(map: string, initialSubject: string, off: (() => void)[]): HTMLElement {
   const list = h('div', { class: 'study-questions' }, h('p', {}, 'Loading questions…'));
   const status = h('p', { class: 'study-board-status', attrs: { role: 'status' } });
   const focusHint = h('p', { attrs: { role: 'status', hidden: true } }, 'You can read the board while focusing. Board actions resume when focus ends.');
   const input = h('textarea', { class: 'input', attrs: { maxlength: QUESTION_LIMIT, rows: 2, required: true, id: 'study-board-input' } });
   const label = h('label', { attrs: { for: input.id } }, 'Ask a question');
   const submit = h('button', { class: 'btn btn-small', attrs: { type: 'submit' } }, 'Post question');
+  const subjectInput = h('select', { class: 'input', attrs: { id: 'study-board-subject' } },
+    ...SUBJECTS.map(({ id, label }) => h('option', { attrs: { value: id } }, id === 'general' ? 'General study' : label)),
+  );
+  let subject = SUBJECTS.some(({ id }) => id === initialSubject) ? initialSubject : 'general';
+  subjectInput.value = subject;
+  const drafts = new Map<string, { text: string; replyTo: BoardQuestion | null }>();
+  let loading = true;
   let replyTo: BoardQuestion | null = null;
   let questions: BoardQuestion[] = [];
   let pendingText: string | null = null;
@@ -128,9 +138,10 @@ function questionBoard(map: string, off: (() => void)[]): HTMLElement {
     class: 'study-board-form',
     on: { submit: (event) => {
       event.preventDefault();
-      if (app.timer.state.phase === 'focus' || !input.value.trim() || pendingText !== null) return;
+      if (loading || app.timer.state.phase === 'focus' || !input.value.trim() || pendingText !== null) return;
       pendingText = input.value;
       submit.disabled = true;
+      subjectInput.disabled = true;
       status.textContent = 'Posting…';
       app.net.sendBoardAction(replyTo
         ? { kind: 'answer', questionId: replyTo.id, text: input.value }
@@ -141,10 +152,11 @@ function questionBoard(map: string, off: (() => void)[]): HTMLElement {
   const controls = h('fieldset', { class: 'study-board-controls', attrs: { 'aria-label': 'Question board actions' } }, list, form);
   const updateFocus = (): void => {
     const focusing = app.timer.state.phase === 'focus';
-    controls.disabled = focusing;
+    controls.disabled = focusing || loading;
     focusHint.hidden = !focusing;
   };
   const render = (): void => {
+    if (loading) return;
     const hidden = new Set(app.net.players().filter((player) => player.muted || player.blocked).map((player) => player.id));
     const visible = questions.filter((question) => !hidden.has(question.authorId));
     list.replaceChildren(...visible.map((question) => {
@@ -163,20 +175,39 @@ function questionBoard(map: string, off: (() => void)[]): HTMLElement {
     if (visible.length === 0) list.append(h('p', {}, 'No questions yet.'));
     if (replyTo && !visible.some((question) => question.id === replyTo?.id)) choose(null);
   };
+  subjectInput.addEventListener('change', () => {
+    if (subjectInput.value === subject) return;
+    drafts.set(subject, { text: input.value, replyTo });
+    subject = subjectInput.value;
+    const draft = drafts.get(subject);
+    input.value = draft?.text ?? '';
+    choose(draft?.replyTo ?? null);
+    questions = [];
+    loading = true;
+    status.textContent = '';
+    list.replaceChildren(h('p', {}, 'Loading questions…'));
+    updateFocus();
+    app.net.sendBoardAction({ kind: 'read', subject });
+  });
+
   off.push(
     app.net.questionBoard.subscribe((snapshot) => {
-      if (snapshot.map !== map) return;
+      if (snapshot.map !== map || snapshot.subject !== subject) return;
+      loading = false;
+      updateFocus();
       questions = snapshot.questions;
       if (snapshot.posted) {
         if (input.value === pendingText) input.value = '';
         pendingText = null;
         submit.disabled = false;
+        subjectInput.disabled = false;
         status.textContent = 'Posted.';
         choose(null);
       }
       if (snapshot.notice) {
         pendingText = null;
         submit.disabled = false;
+        subjectInput.disabled = false;
         status.textContent = snapshot.notice;
       }
       render();
@@ -187,8 +218,9 @@ function questionBoard(map: string, off: (() => void)[]): HTMLElement {
     }),
   );
   updateFocus();
-  app.net.sendBoardAction({ kind: 'read' });
-  return h('section', { class: 'study-section' }, h('h3', {}, 'Question board'), focusHint, controls, status);
+  app.net.sendBoardAction({ kind: 'read', subject });
+  const filter = h('div', { class: 'row wrap' }, h('label', { attrs: { for: subjectInput.id } }, 'Subject'), subjectInput);
+  return h('section', { class: 'study-section' }, h('h3', {}, 'Question board'), filter, focusHint, controls, status);
 }
 
 function postAction(question: BoardQuestion, post: BoardPost): HTMLButtonElement {

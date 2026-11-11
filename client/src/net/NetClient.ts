@@ -196,7 +196,14 @@ export class NetClient implements NetApi {
 
   players(): PlayerInfo[] {
     const out: PlayerInfo[] = [];
-    this.eachPeer((p) => out.push({ id: p.id, name: p.name, map: p.map, muted: this.muted.has(p.id), blocked: this.blocked.has(p.id) }));
+    this.eachPeer((p) => out.push({
+      id: p.id,
+      name: p.name,
+      map: p.map,
+      tzOffsetMin: p.tz,
+      muted: this.muted.has(p.id),
+      blocked: this.blocked.has(p.id),
+    }));
     return out;
   }
 

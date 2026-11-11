@@ -14,6 +14,7 @@ export interface PlayerInfo {
   id: string;
   name: string;
   map: string;
+  tzOffsetMin: number;
   muted: boolean;
   blocked: boolean;
 }

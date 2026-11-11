@@ -65,7 +65,7 @@ test('question boards isolate maps, enforce ownership and focus, and filter bloc
   const boards = new QuestionBoards(new Map([a, b, c].map(({ session }) => [session.id, session])), () => ({
     server: 'Maple', roomId: 'test',
   }));
-  for (const p of [a, b, c]) boards.handle(p.session, { kind: 'read' }, 0);
+  for (const p of [a, b, c]) boards.handle(p.session, { kind: 'read', subject: 'math' }, 0);
   boards.handle(a.session, { kind: 'ask', text: '  How\n do I start? ' }, 1);
   const question = b.messages.at(-1)?.questions[0];
   assert.ok(question);
@@ -74,6 +74,13 @@ test('question boards isolate maps, enforce ownership and focus, and filter bloc
   assert.equal(a.messages.at(-1)?.posted, true);
   assert.equal(c.messages.length, 1);
   assert.equal(c.messages[0].questions.length, 0);
+  boards.handle(b.session, { kind: 'read', subject: 'science' }, 2);
+  assert.equal(b.messages.at(-1)?.subject, 'science');
+  assert.equal(b.messages.at(-1)?.questions.length, 0);
+  boards.handle(b.session, { kind: 'read', subject: 'unknown' }, 3);
+  assert.equal(b.messages.at(-1)?.subject, 'science');
+  boards.handle(b.session, { kind: 'read', subject: 'math' }, 4);
+  assert.equal(b.messages.at(-1)?.questions[0].id, question.id);
 
   boards.handle(b.session, { kind: 'answer', questionId: question.id, text: 'Start with the first example.' }, 2);
   assert.equal(a.messages.at(-1)?.questions[0].answers.length, 1);

@@ -42,13 +42,15 @@ export interface BoardQuestion extends BoardPost {
 
 export interface QuestionBoardSnapshot {
   map: string;
+  subject: string;
   questions: BoardQuestion[];
   notice?: string;
   posted?: true;
 }
 
 export type BoardAction =
-  | { kind: 'read' | 'close' }
+  | { kind: 'read'; subject: string }
+  | { kind: 'close' }
   | { kind: 'ask'; text: string }
   | { kind: 'answer'; questionId: string; text: string }
   | { kind: 'remove'; questionId: string; answerId?: string }

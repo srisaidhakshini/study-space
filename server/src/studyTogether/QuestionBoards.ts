@@ -4,6 +4,7 @@ import {
   hasQuestionBoard,
   QUESTION_LIMIT,
   STUDY_TOGETHER,
+  SUBJECTS,
   type BoardPost,
   type QuestionBoardSnapshot,
 } from '@study/shared';
@@ -31,10 +32,19 @@ function ownerOf(session: PlayerSession): string {
   return session.userId ? `account:${session.userId}` : `guest:${session.id}`;
 }
 
-/** Every room has its own board for each of the designated public maps. */
+interface BoardSelection {
+  map: string;
+  subject: string;
+}
+
+function boardKey({ map, subject }: BoardSelection): string {
+  return `${map}:${subject}`;
+}
+
+/** Each designated map has one board per subject within a room instance. */
 export class QuestionBoards {
-  private readonly byMap = new Map<string, Question[]>();
-  private readonly viewers = new WeakMap<PlayerSession, string>();
+  private readonly boards = new Map<string, Question[]>();
+  private readonly viewers = new WeakMap<PlayerSession, BoardSelection>();
   private readonly lastRead = new WeakMap<PlayerSession, number>();
   private readonly lastWrite = new WeakMap<PlayerSession, number>();
 
@@ -52,27 +62,32 @@ export class QuestionBoards {
     }
     if (!hasQuestionBoard(map)) return;
     if (raw.kind === 'read') {
-      if (this.viewers.get(session) === map && now - (this.lastRead.get(session) ?? -Infinity) < 1000) return;
-      this.viewers.set(session, map);
+      const subject = raw.subject;
+      if (typeof subject !== 'string' || !SUBJECTS.some(({ id }) => id === subject)) return;
+      const previous = this.viewers.get(session);
+      if (previous?.map === map && previous.subject === subject && now - (this.lastRead.get(session) ?? -Infinity) < 1000) return;
+      this.viewers.set(session, { map, subject });
       this.lastRead.set(session, now);
       return this.send(session);
     }
     if (raw.kind !== 'ask' && raw.kind !== 'answer' && raw.kind !== 'remove' && raw.kind !== 'report') return;
-    if (this.viewers.get(session) !== map) return;
+    const selection = this.viewers.get(session);
+    if (selection?.map !== map) return;
     if (session.timer.phase === 'focus') return this.send(session, 'The board is paused while you focus.');
     if (now - (this.lastWrite.get(session) ?? -Infinity) < WRITE_INTERVAL_MS) {
       return this.send(session, 'Wait a few seconds before using the board again.');
     }
     this.lastWrite.set(session, now);
 
-    const questions = this.byMap.get(map) ?? [];
+    const key = boardKey(selection);
+    const questions = this.boards.get(key) ?? [];
     const owner = ownerOf(session);
     if (raw.kind === 'ask') {
       const post = this.post(session, raw.text);
       if (!post) return this.send(session, 'Enter a question first.');
       questions.unshift({ ...post, answers: [] });
       questions.length = Math.min(questions.length, QUESTIONS_PER_BOARD);
-      this.byMap.set(map, questions);
+      this.boards.set(key, questions);
     } else {
       const index = questions.findIndex((question) => question.id === raw.questionId && this.visible(session, question));
       const question = questions[index];
@@ -105,7 +120,7 @@ export class QuestionBoards {
       }
     }
     for (const viewer of this.sessions.values()) {
-      if (viewer.player.map !== map) continue;
+      if (viewer.player.map !== map || this.viewers.get(viewer)?.subject !== selection.subject) continue;
       const posted = viewer === session && (raw.kind === 'ask' || raw.kind === 'answer');
       this.send(viewer, undefined, posted);
     }
@@ -113,14 +128,16 @@ export class QuestionBoards {
 
   send(session: PlayerSession, notice?: string, posted = false): void {
     const map = session.player.map;
-    if (this.viewers.get(session) !== map) return;
+    const selection = this.viewers.get(session);
+    if (selection?.map !== map) return;
     const owner = ownerOf(session);
     const view = ({ id, authorId, author, text, owner: postOwner }: Post): BoardPost => ({
       id, authorId, author, text, own: postOwner === owner,
     });
     const snapshot: QuestionBoardSnapshot = {
       map,
-      questions: (this.byMap.get(map) ?? []).filter((question) => this.visible(session, question)).map((question) => ({
+      subject: selection.subject,
+      questions: (this.boards.get(boardKey(selection)) ?? []).filter((question) => this.visible(session, question)).map((question) => ({
         ...view(question),
         answers: question.answers.filter((answer) => this.visible(session, answer)).map(view),
       })),
