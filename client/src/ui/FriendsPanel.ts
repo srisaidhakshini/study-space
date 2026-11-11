@@ -209,7 +209,7 @@ export function openFriendsPanel(root: HTMLElement): void {
                       h(
                         'span',
                         { class: 'friend-buttons' },
-                        h('span', { class: 'hint' }, 'Remove?'),
+                        h('span', { class: 'hint' }, 'Remove friend and shared buddy tree?'),
                         button('Yes', 'btn btn-small', () => {
                           confirmRemove = null;
                           void run(f.id, () => app.friends.remove(f.id));

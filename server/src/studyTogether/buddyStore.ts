@@ -1,4 +1,5 @@
 import type { BuddyLink } from '@study/shared';
+import { respondToRequest } from '../db/friends';
 import { withDb } from '../db/client';
 
 export interface StoredBuddyLink extends BuddyLink {
@@ -6,44 +7,20 @@ export interface StoredBuddyLink extends BuddyLink {
   acceptedAt: number | null;
 }
 
-const containsUser = (id: string) => ({ OR: [{ firstId: id }, { secondId: id }] });
+const containsUser = (id: string) => ({ OR: [{ requesterId: id }, { addresseeId: id }] });
 
 export function loadBuddyLinks(userId: string): Promise<StoredBuddyLink[]> {
   return withDb(async (db) => {
-    const links = await db.buddyPair.findMany({
-      where: containsUser(userId),
-      include: { first: { select: { name: true } }, second: { select: { name: true } } },
-    });
-    const acceptedIds = links.filter((link) => link.acceptedAt).map((link) => link.id);
-    const focus = acceptedIds.length ? await db.buddyFocus.groupBy({
-      by: ['pairId'],
-      where: { pairId: { in: acceptedIds } },
-      _sum: { durationMs: true },
-    }) : [];
-    const totals = new Map(focus.map((entry) => [entry.pairId, entry._sum.durationMs ?? 0]));
-
-    return links.map((link) => {
-      const first = link.firstId === userId;
-      return {
-        id: link.id,
-        name: first ? link.second.name : link.first.name,
-        userId: first ? link.secondId : link.firstId,
-        acceptedAt: link.acceptedAt?.getTime() ?? null,
-        status: link.acceptedAt ? 'accepted' : first === link.requestedByFirst ? 'outgoing' : 'incoming',
-        focusMinutes: Math.floor((totals.get(link.id) ?? 0) / 60_000),
-      };
-    });
-  });
-}
-
-export function requestBuddy(userId: string, targetId: string): Promise<boolean> {
-  const [firstId, secondId] = [userId, targetId].sort();
-  return withDb(async (db) => {
-    const created = await db.buddyPair.createMany({
-      data: [{ firstId, secondId, requestedByFirst: firstId === userId }],
-      skipDuplicates: true,
-    });
-    return created.count > 0;
+    const rows = await db.$queryRaw<(Omit<StoredBuddyLink, 'acceptedAt'> & { acceptedAt: Date | null })[]>`
+      SELECT f."id", u."id" AS "userId", u."name", f."acceptedAt",
+        CASE WHEN f."status" = 'ACCEPTED' THEN 'accepted'
+          WHEN f."requesterId" = ${userId} THEN 'outgoing' ELSE 'incoming' END AS "status",
+        COALESCE((SELECT SUM(p."durationMs") / 60000 FROM "BuddyFocus" AS p WHERE p."pairId" = f."id"), 0)::int AS "focusMinutes"
+      FROM "Friendship" AS f
+      JOIN "User" AS u ON u."id" = CASE WHEN f."requesterId" = ${userId} THEN f."addresseeId" ELSE f."requesterId" END
+      WHERE f."requesterId" = ${userId} OR f."addresseeId" = ${userId}
+    `;
+    return rows.map((row) => ({ ...row, acceptedAt: row.acceptedAt?.getTime() ?? null }));
   });
 }
 
@@ -51,20 +28,19 @@ export function changeBuddy(
   userId: string,
   linkId: string,
   kind: 'accept' | 'decline' | 'cancel' | 'remove',
-  now: number,
 ): Promise<string | null> {
   return withDb(async (db) => {
-    const link = await db.buddyPair.findFirst({ where: { id: linkId, ...containsUser(userId) } });
+    const link = await db.friendship.findFirst({ where: { id: linkId, ...containsUser(userId) } });
     if (!link) return null;
-    const first = link.firstId === userId;
-    const requester = first === link.requestedByFirst;
-    const valid = link.acceptedAt ? kind === 'remove' : requester ? kind === 'cancel' : kind === 'accept' || kind === 'decline';
+    const requester = link.requesterId === userId;
+    const other = requester ? link.addresseeId : link.requesterId;
+    const valid = link.status === 'ACCEPTED'
+      ? kind === 'remove'
+      : requester ? kind === 'cancel' : kind === 'accept' || kind === 'decline';
     if (!valid) return null;
-    const where = { id: linkId, acceptedAt: link.acceptedAt };
-    const result = kind === 'accept'
-      ? await db.buddyPair.updateMany({ where, data: { acceptedAt: new Date(now) } })
-      : await db.buddyPair.deleteMany({ where });
-    return result.count ? (first ? link.secondId : link.firstId) : null;
+    if (kind === 'accept') return await respondToRequest(userId, other, true) ? other : null;
+    const deleted = await db.friendship.deleteMany({ where: { id: linkId, status: link.status } });
+    return deleted.count ? other : null;
   });
 }
 
@@ -72,8 +48,8 @@ export function changeBuddy(
 export function saveBuddyFocus(pairId: string, periodId: string, durationMs: number): Promise<number> {
   return withDb((db) => db.$executeRaw`
     INSERT INTO "BuddyFocus" ("id", "pairId", "durationMs")
-    SELECT ${periodId}, "id", ${durationMs}::integer FROM "BuddyPair"
-    WHERE "id" = ${pairId} AND "acceptedAt" IS NOT NULL
+    SELECT ${periodId}, "id", ${durationMs}::integer FROM "Friendship"
+    WHERE "id" = ${pairId} AND "status" = 'ACCEPTED'
     ON CONFLICT ("id") DO UPDATE SET "durationMs" =
       GREATEST("BuddyFocus"."durationMs", EXCLUDED."durationMs")
   `);

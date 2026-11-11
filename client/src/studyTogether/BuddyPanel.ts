@@ -10,18 +10,18 @@ export function buddyPeerAction(player: PlayerInfo): HTMLElement | null {
   if (!app.account.signedIn || !app.net.buddyCandidates.has(player.id) || player.blocked) return null;
   const existing = app.net.buddies.links.find((link) => app.net.buddies.online[link.id] === player.id);
   if (existing) {
-    const label = { accepted: 'Buddy', incoming: 'Request received', outgoing: 'Request sent' }[existing.status];
+    const label = { accepted: 'Friend', incoming: 'Request received', outgoing: 'Request sent' }[existing.status];
     return h('span', { class: 'badge' }, label);
   }
-  return button('Request buddy', 'btn btn-small', () => app.net.sendBuddyAction({ kind: 'request', peerId: player.id }), {
-    'aria-label': `Request ${player.name} as a buddy`,
+  return button('Add friend', 'btn btn-small', () => app.net.sendBuddyAction({ kind: 'request', peerId: player.id }), {
+    'aria-label': `Request ${player.name} as a friend`,
   });
 }
 
 function action(kind: Exclude<BuddyAction['kind'], 'request'>, link: BuddyLink): HTMLButtonElement {
-  const labels = { accept: 'Accept', decline: 'Decline', cancel: 'Cancel request', remove: 'Remove buddy' };
+  const labels = { accept: 'Accept', decline: 'Decline', cancel: 'Cancel request', remove: 'Remove friend' };
   return button(labels[kind], 'btn btn-small', () => {
-    if (kind === 'remove' && !window.confirm(`Remove ${link.name} as a buddy? Your shared buddy tree will be deleted.`)) return;
+    if (kind === 'remove' && !window.confirm(`Remove ${link.name} as a friend? Your shared buddy tree will be deleted.`)) return;
     app.net.sendBuddyAction({ kind, linkId: link.id });
   }, { 'aria-label': `${labels[kind]} · ${link.name}` });
 }
@@ -29,7 +29,7 @@ function action(kind: Exclude<BuddyAction['kind'], 'request'>, link: BuddyLink):
 function buddyRow(link: BuddyLink): HTMLElement {
   if (link.status === 'incoming') {
     return h('div', { class: 'buddy-row' },
-      h('p', {}, `${link.name} sent you a buddy request.`),
+      h('p', {}, `${link.name} sent you a friend request.`),
       h('div', { class: 'row wrap' }, action('accept', link), action('decline', link)),
     );
   }
@@ -61,10 +61,10 @@ export function buddyPanel(): HTMLElement {
     return order[a.status] - order[b.status] || a.name.localeCompare(b.name);
   });
   return h('section', { class: 'people-buddies' },
-    h('h3', {}, 'Buddies'),
+    h('h3', {}, 'Friends and buddy trees'),
     !app.account.signedIn
-      ? h('p', { class: 'hint' }, 'Sign in to send buddy requests and grow private trees together.')
-      : h('p', { class: 'hint' }, 'Send a request to a signed-in player here. Once they accept, your tree grows while you both focus in the same room.'),
+      ? h('p', { class: 'hint' }, 'Sign in to send friend requests and grow private trees together.')
+      : h('p', { class: 'hint' }, 'Your accepted friends can visit a friends-only home. A buddy tree grows while you both focus in the same room.'),
     ...ordered.map(buddyRow),
   );
 }

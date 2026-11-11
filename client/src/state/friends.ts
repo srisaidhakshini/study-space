@@ -24,6 +24,8 @@ export class FriendsStore {
   private panelOpen = 0;
   private timer: number | null = null;
   private signedInBefore = false;
+  private roomRelationships = '';
+  private refreshVersion = 0;
 
   constructor(
     private readonly account: AccountStore,
@@ -34,6 +36,12 @@ export class FriendsStore {
     net.changed.subscribe(() => {
       if (net.online && account.signedIn) void this.refresh();
       this.schedule();
+    });
+    net.buddiesChanged.subscribe(() => {
+      const relationships = net.buddies.links.map(({ id, status }) => `${id}:${status}`).sort().join(',');
+      if (relationships === this.roomRelationships) return;
+      this.roomRelationships = relationships;
+      if (net.online && account.signedIn) void this.refresh();
     });
     this.accountChanged();
   }
@@ -65,17 +73,22 @@ export class FriendsStore {
       this.clear();
       return;
     }
+    const version = ++this.refreshVersion;
     this.loading = true;
     this.changed.emit();
     try {
       const body = await this.account.authed<FriendsResponse>('/api/friends');
+      if (version !== this.refreshVersion) return;
       this.friends = body.friends;
       this.error = null;
     } catch (caught) {
+      if (version !== this.refreshVersion) return;
       this.error = caught instanceof Error ? caught.message : 'Could not load your friends.';
     } finally {
-      this.loading = false;
-      this.changed.emit();
+      if (version === this.refreshVersion) {
+        this.loading = false;
+        this.changed.emit();
+      }
     }
   }
 
@@ -129,6 +142,7 @@ export class FriendsStore {
   }
 
   private clear(): void {
+    this.refreshVersion += 1;
     this.friends = [];
     this.error = null;
     this.loading = false;

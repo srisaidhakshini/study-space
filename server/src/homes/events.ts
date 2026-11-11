@@ -15,6 +15,8 @@ export interface HomeEventMap {
   street: [page: number];
   /** Two accounts became friends or stopped being friends. */
   friendship: [a: string, b: string];
+  /** A request or friendship changed in either interface. */
+  friendList: [a: string, b: string];
 }
 
 class HomeBus {

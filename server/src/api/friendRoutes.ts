@@ -43,6 +43,7 @@ async function request(req: Request, res: Response): Promise<void> {
   if (result === 'already-sent') return fail(res, 409, 'You already sent a request to them');
   // Two people adding each other become friends straight away.
   if (result === 'accepted') homeBus.emit('friendship', userId, target.id);
+  homeBus.emit('friendList', userId, target.id);
   await respondWithList(res, userId);
 }
 
@@ -53,6 +54,7 @@ async function respond(req: Request, res: Response): Promise<void> {
   if (typeof input.id !== 'string' || input.id === '' || typeof input.accept !== 'boolean') return fail(res, 400, 'Say whose request and whether to accept it');
   if (!(await respondToRequest(userId, input.id, input.accept))) return fail(res, 404, 'There is no such friend request');
   if (input.accept) homeBus.emit('friendship', userId, input.id);
+  homeBus.emit('friendList', userId, input.id);
   await respondWithList(res, userId);
 }
 
@@ -65,6 +67,7 @@ async function remove(req: Request, res: Response): Promise<void> {
   if (!removed) return fail(res, 404, 'You are not friends and have no request with them');
   // Visitors who were allowed in only as friends are shown out.
   if (wasFriends) homeBus.emit('friendship', userId, other);
+  homeBus.emit('friendList', userId, other);
   await respondWithList(res, userId);
 }
 

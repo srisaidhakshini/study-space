@@ -5,10 +5,11 @@ import { test } from 'node:test';
 import { Client, type Room } from '@colyseus/sdk';
 import {
   BUDDIES, C2S, S2C, TILE, defaultAppearance, feetBlocked,
-  type BuddyLinks, type JoinResponse, type SitResultMessage, type TimerEventMessage,
+  type BuddyLinks, type FriendsResponse, type JoinResponse, type SitResultMessage, type TimerEventMessage,
 } from '@study/shared';
 import { issueToken } from '../auth/token';
 import { createServer } from '../createServer';
+import { areFriends } from '../db/friends';
 import { closeDb, db } from '../db/client';
 import { enqueue } from '../rooms/persist';
 import { getWorld } from '../world/maps';
@@ -96,7 +97,17 @@ test('mutual buddy requests persist and only simultaneous focus in one room wate
     const rejoined = await join('BuddyBen', 'cafe');
     await until(() => rejoined.views().at(-1)?.links.find((link) => link.id === incoming.id && link.status === 'incoming'), 'Pending request was lost across reconnect');
 
-    rejoined.room.send(BUDDIES.action, { kind: 'accept', linkId: incoming.id });
+    const [aliceAccount, benAccount] = accounts;
+    const headers = { authorization: `Bearer ${issueToken(benAccount.id, now())}`, 'content-type': 'application/json' };
+    const friends = await fetch(base + '/api/friends', { headers });
+    assert.equal(friends.status, 200);
+    const pending = await friends.json() as FriendsResponse;
+    assert.equal(pending.friends.find((friend) => friend.id === aliceAccount.id)?.status, 'incoming');
+    const accept = await fetch(base + '/api/friends/respond', {
+      method: 'POST', headers, body: JSON.stringify({ id: aliceAccount.id, accept: true }),
+    });
+    assert.equal(accept.status, 200);
+    assert.equal(await areFriends(aliceAccount.id, benAccount.id), true);
     await until(() => alice.views().at(-1)?.links.find((link) => link.id === incoming.id && link.status === 'accepted'), 'Acceptance did not reach sender');
     await alice.start();
     offset += 61_000;
@@ -120,6 +131,12 @@ test('mutual buddy requests persist and only simultaneous focus in one room wate
     assert.equal(elsewhere.views().at(-1)?.links[0].focusMinutes, 1);
     await elsewhere.stop();
     await alice.stop();
+    const removed = await fetch(base + '/api/friends/' + aliceAccount.id, {
+      method: 'DELETE', headers: { authorization: `Bearer ${issueToken(benAccount.id, now())}` },
+    });
+    assert.equal(removed.status, 200);
+    await until(() => alice.views().at(-1)?.links.length === 0 ? true : undefined, 'Removing a friend did not remove their tree');
+    assert.equal(await db().buddyFocus.count({ where: { pairId: incoming.id } }), 0);
   } finally {
     world.start = initialStart;
     for (const stop of stopTimers.values()) await stop().catch(() => undefined);

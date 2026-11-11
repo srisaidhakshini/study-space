@@ -25,9 +25,6 @@ model User {
   createdAt    DateTime @default(now())
   lastLoginAt  DateTime @default(now())
 
-  buddyPairsFirst  BuddyPair[] @relation("BuddyFirst")
-  buddyPairsSecond BuddyPair[] @relation("BuddySecond")
-
   sessions     StudySession[]
   transactions CoinTransaction[]
   home         Home?
@@ -136,28 +133,16 @@ model Friendship {
   requesterId String
   addresseeId String
   status      FriendshipStatus @default(PENDING)
+  acceptedAt  DateTime?
   createdAt   DateTime         @default(now())
 
   requester User @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
   addressee User @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
 
-  @@unique([requesterId, addresseeId])
-  @@index([addresseeId])
-}
-
-model BuddyPair {
-  id               String    @id @default(cuid())
-  firstId          String
-  secondId         String
-  requestedByFirst Boolean
-  acceptedAt       DateTime?
-
-  first   User         @relation("BuddyFirst", fields: [firstId], references: [id], onDelete: Cascade)
-  second  User         @relation("BuddySecond", fields: [secondId], references: [id], onDelete: Cascade)
   periods BuddyFocus[]
 
-  @@unique([firstId, secondId])
-  @@index([secondId])
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId])
 }
 
 model BuddyFocus {
@@ -165,7 +150,7 @@ model BuddyFocus {
   pairId     String
   durationMs Int
 
-  pair BuddyPair @relation(fields: [pairId], references: [id], onDelete: Cascade)
+  pair Friendship @relation(fields: [pairId], references: [id], onDelete: Cascade)
 
   @@index([pairId])
 }

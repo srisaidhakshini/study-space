@@ -1,6 +1,7 @@
 import type { FriendEntry } from '@study/shared';
 import { Prisma } from '../generated/prisma/client';
 import { visibilityFromDb } from './homes';
+import { serverConfig } from '../config';
 import { withDb } from './client';
 
 /** Whether two accounts are accepted friends. */
@@ -85,7 +86,7 @@ export type RequestResult = 'sent' | 'accepted' | 'already-friends' | 'already-s
  */
 export function requestFriend(from: string, to: string): Promise<RequestResult> {
   return withDb(async (prisma) => {
-    const existing = await prisma.friendship.findFirst({
+    const lookup = () => prisma.friendship.findFirst({
       where: {
         OR: [
           { requesterId: from, addresseeId: to },
@@ -93,31 +94,35 @@ export function requestFriend(from: string, to: string): Promise<RequestResult> 
         ],
       },
     });
-    if (existing) {
-      if (existing.status === 'ACCEPTED') return 'already-friends';
-      if (existing.requesterId === from) return 'already-sent';
-      await prisma.friendship.update({ where: { id: existing.id }, data: { status: 'ACCEPTED' } });
-      return 'accepted';
+    let existing = await lookup();
+    if (!existing) {
+      try {
+        await prisma.friendship.create({ data: { requesterId: from, addresseeId: to } });
+        return 'sent';
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+        existing = await lookup();
+        if (!existing) throw error;
+      }
     }
-    try {
-      await prisma.friendship.create({ data: { requesterId: from, addresseeId: to } });
-      return 'sent';
-    } catch (error) {
-      // A simultaneous identical request: treat it as already sent.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return 'already-sent';
-      throw error;
-    }
+    if (existing.status === 'ACCEPTED') return 'already-friends';
+    if (existing.requesterId === from) return 'already-sent';
+    const result = await prisma.friendship.updateMany({
+      where: { id: existing.id, status: 'PENDING' },
+      data: { status: 'ACCEPTED', acceptedAt: new Date(serverConfig.now()) },
+    });
+    return result.count ? 'accepted' : 'already-friends';
   });
 }
 
 /** Answers a request that `requesterId` sent to `me`. False if there is no such pending request. */
 export function respondToRequest(me: string, requesterId: string, accept: boolean): Promise<boolean> {
   return withDb(async (prisma) => {
-    const row = await prisma.friendship.findFirst({ where: { requesterId, addresseeId: me, status: 'PENDING' } });
-    if (!row) return false;
-    if (accept) await prisma.friendship.update({ where: { id: row.id }, data: { status: 'ACCEPTED' } });
-    else await prisma.friendship.delete({ where: { id: row.id } });
-    return true;
+    const where = { requesterId, addresseeId: me, status: 'PENDING' } as const;
+    const result = accept
+      ? await prisma.friendship.updateMany({ where, data: { status: 'ACCEPTED', acceptedAt: new Date(serverConfig.now()) } })
+      : await prisma.friendship.deleteMany({ where });
+    return result.count > 0;
   });
 }
 

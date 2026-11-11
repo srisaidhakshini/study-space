@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { BUDDIES, S2C, type BuddyLinks } from '@study/shared';
+import { requestFriend } from '../db/friends';
+import { homeBus } from '../homes/events';
 import { retryOnce } from '../rooms/persist';
 import type { PlayerSession } from '../rooms/session';
 import { isPlainObject } from '../rooms/text';
-import { changeBuddy, loadBuddyLinks, requestBuddy, saveBuddyFocus, type StoredBuddyLink } from './buddyStore';
+import { changeBuddy, loadBuddyLinks, saveBuddyFocus, type StoredBuddyLink } from './buddyStore';
 
 const ROOMS = new Set<BuddyRoom>();
 const ACTION_COOLDOWN_MS = 1500;
@@ -31,12 +33,14 @@ export class BuddyRoom {
   private readonly lastAction = new WeakMap<PlayerSession, number>();
   private readonly pendingSaves = new Set<Promise<void>>();
   private readonly periods = new Map<string, Period>();
+  private offFriendList: (() => void) | null = null;
   private lastFocusTick: number | null = null;
 
   constructor(private readonly sessions: ReadonlyMap<string, PlayerSession>) {}
 
   open(): void {
     ROOMS.add(this);
+    this.offFriendList = homeBus.on('friendList', (first, second) => void this.refreshAccounts(first, second));
   }
 
   join(session: PlayerSession): void {
@@ -52,6 +56,7 @@ export class BuddyRoom {
 
   async close(): Promise<void> {
     ROOMS.delete(this);
+    this.offFriendList?.();
     for (const [id, period] of this.periods) this.persist(id, period);
     this.periods.clear();
     this.links.clear();
@@ -82,7 +87,7 @@ export class BuddyRoom {
     const kind = raw.kind;
     if (kind !== 'request' && kind !== 'accept' && kind !== 'decline' && kind !== 'cancel' && kind !== 'remove') return;
     if (now - (this.lastAction.get(session) ?? -Infinity) < ACTION_COOLDOWN_MS) {
-      return tell(session, 'Wait a moment before changing buddy requests again.');
+      return tell(session, 'Wait a moment before changing friend requests again.');
     }
     this.lastAction.set(session, now);
     try {
@@ -90,13 +95,15 @@ export class BuddyRoom {
       if (kind === 'request') {
         const target = typeof raw.peerId === 'string' ? this.sessions.get(raw.peerId) : undefined;
         if (!target?.userId || target.userId === userId || blocked(session, target)) {
-          return tell(session, 'That player cannot receive a buddy request.');
+          return tell(session, 'That player cannot receive a friend request.');
         }
         targetId = target.userId;
-        if (await requestBuddy(userId, targetId)) {
-          tell(target, `${session.player.name} sent you a buddy request. Open People to respond.`);
-          tell(session, 'Buddy request sent.');
+        const result = await requestFriend(userId, targetId);
+        if (result === 'sent') {
+          tell(target, `${session.player.name} sent you a friend request. Open People or Friends to respond.`);
+          tell(session, 'Friend request sent.');
         }
+        if (result === 'accepted') homeBus.emit('friendship', userId, targetId);
       } else {
         if (typeof raw.linkId !== 'string' || raw.linkId.length > 64) return;
         const link = this.links.get(session)?.find((item) => item.id === raw.linkId);
@@ -104,12 +111,14 @@ export class BuddyRoom {
           const peer = [...this.links.keys()].find((item) => item.userId === link.userId);
           if (peer && blocked(session, peer)) return tell(session, 'Unblock this player before accepting their request.');
         }
-        targetId = await changeBuddy(userId, raw.linkId, kind, now);
+        targetId = await changeBuddy(userId, raw.linkId, kind);
+        if (targetId && (kind === 'accept' || kind === 'remove')) homeBus.emit('friendship', userId, targetId);
       }
-      refreshUsers(userId, targetId);
+      if (targetId) homeBus.emit('friendList', userId, targetId);
+      else void this.refresh(session);
     } catch (error) {
       console.warn('[buddies] Could not change buddy link', error);
-      if (this.links.has(session)) tell(session, 'Buddy requests are temporarily unavailable.');
+      if (this.links.has(session)) tell(session, 'Friend requests are temporarily unavailable.');
     }
   }
 
@@ -153,9 +162,9 @@ export class BuddyRoom {
     }
   }
 
-  refreshAccounts(first: string, second: string | null): void {
+  async refreshAccounts(first: string, second: string | null): Promise<void> {
     for (const session of this.links.keys()) {
-      if (session.userId === first || session.userId === second) void this.refresh(session);
+      if (session.userId === first || session.userId === second) await this.refresh(session);
     }
   }
 
@@ -183,5 +192,5 @@ export class BuddyRoom {
 }
 
 function refreshUsers(first: string, second: string | null): void {
-  for (const room of ROOMS) room.refreshAccounts(first, second);
+  for (const room of ROOMS) void room.refreshAccounts(first, second);
 }
