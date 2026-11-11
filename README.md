@@ -98,6 +98,24 @@ whole minutes you studied.
 - If WebGL fails to start the game falls back to the Canvas renderer
   automatically (force it with `?renderer=canvas`).
 
+## Voice and study-desk video
+
+Both run peer to peer over WebRTC; the game server only relays the signalling.
+
+- **Voice** (top right, "Join voice"): talk with everyone in your room.
+  "Mic on / Mic muted" toggles your microphone, "Leave voice" ends it. Muted
+  and blocked players are never connected to you, and the People list shows who
+  is in the call.
+- **Study-desk video** ("Start camera", shown while you are seated): share your
+  camera with the other players seated at study desks on the same map. Standing
+  up, changing map or leaving removes you automatically. "Pause camera" turns
+  the picture off without leaving.
+- Browsers ask permission for the microphone and camera the first time. Nothing
+  is recorded or stored.
+- Behind strict networks a TURN relay is needed. Set `TURN_HOST` and
+  `TURN_SECRET` on the server (the browser gets short-lived credentials from
+  `GET /api/ice`). Hosting guide, including the relay: `deploy/oracle/README.md`.
+
 ## Accounts, stats and coins
 
 - **Guests** get a random name and nothing is saved on the server. This
