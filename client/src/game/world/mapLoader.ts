@@ -102,11 +102,8 @@ export function loadMap(scene: Phaser.Scene, id: string): LoadedMap {
  * centring maps that are smaller than the view.
  */
 export function fitCamera(camera: Phaser.Cameras.Scene2D.Camera, viewW: number, viewH: number, map: LoadedMap): void {
-  const base = Phaser.Math.Clamp(Math.floor(Math.min(viewW / 480, viewH / 300)), 2, 6);
-  // Grow in quarter steps (a 16 px tile stays a whole number of screen pixels) until the map covers
-  // the screen, so there are no empty bands at the sides. At most one step above the base zoom.
-  const cover = Math.ceil(Math.max(viewW / map.widthPx, viewH / map.heightPx) * 4) / 4;
-  const zoom = Math.max(base, Math.min(cover, base + 1, 6));
+  // Whole-number zoom only: fractional zoom puts tile edges between screen pixels and draws seams.
+  const zoom = Phaser.Math.Clamp(Math.floor(Math.min(viewW / 480, viewH / 300)), 2, 6);
   camera.setSize(viewW, viewH);
   camera.setZoom(zoom);
   const visibleW = viewW / zoom;
