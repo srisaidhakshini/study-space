@@ -2,7 +2,7 @@ import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import cors from 'cors';
 import express from 'express';
-import { MAX_PLAYERS_PER_ROOM, ROOM_NAME, type ApiError } from '@study/shared';
+import { MAX_PLAYERS_PER_ROOM, ROOM_NAME, SIGNAL_MAX_PAYLOAD, type ApiError } from '@study/shared';
 import { registerRoutes } from './api/routes';
 import { serverConfig } from './config';
 import { WorldRoom } from './rooms/WorldRoom';
@@ -25,7 +25,7 @@ export function createServer(settings: ServerSettings = {}): GameServer {
   getWorld(); // fail fast, with a readable message, if the assets are missing
 
   const server = new Server({
-    transport: new WebSocketTransport(),
+    transport: new WebSocketTransport({ maxPayload: SIGNAL_MAX_PAYLOAD }),
     gracefullyShutdown: false,
     greet: false,
     express: (app) => {

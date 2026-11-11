@@ -41,6 +41,7 @@ import {
 } from '@study/shared';
 import { bus } from '../bus';
 import { Emitter } from '../state/emitter';
+import { VideoClient } from '../voice/VideoClient';
 import { VoiceClient } from '../voice/VoiceClient';
 import type { ChatLine, NetApi, NetStatus, PlayerInfo } from './types';
 
@@ -109,6 +110,14 @@ export class NetClient implements NetApi {
   readonly voice = new VoiceClient(
     { send: (type, payload) => this.send(type, payload) },
     (id) => this.muted.has(id) || this.blocked.has(id),
+    (id) => this.blocked.has(id),
+    () => this.fetchIce(),
+  );
+
+  /** Camera sharing between people seated at study desks. Ends when you stand up or leave the room. */
+  readonly video = new VideoClient(
+    { send: (type, payload) => this.send(type, payload) },
+    (id) => this.muted.has(id),
     (id) => this.blocked.has(id),
     () => this.fetchIce(),
   );
@@ -184,12 +193,14 @@ export class NetClient implements NetApi {
   mute(id: string): void {
     this.muted.add(id);
     this.voice.refreshSilenced();
+    this.video.changed.emit();
     this.changed.emit();
   }
 
   unmute(id: string): void {
     this.muted.delete(id);
     this.voice.refreshSilenced();
+    this.video.changed.emit();
     this.changed.emit();
   }
 
@@ -197,6 +208,7 @@ export class NetClient implements NetApi {
     this.blocked.add(id);
     this.send<BlockMessage>(C2S.block, { targetId: id });
     this.voice.drop(id);
+    this.video.drop(id);
     this.changed.emit();
   }
 
@@ -331,6 +343,7 @@ export class NetClient implements NetApi {
     this.muted.clear();
     this.blocked.clear();
     this.voice.reset();
+    this.video.reset();
     if (room) room.removeAllListeners();
   }
 
@@ -354,6 +367,10 @@ export class NetClient implements NetApi {
     room.onMessage(S2C.voicePeerJoined, (m: VoicePeerMessage) => this.voice.onPeerJoined(m));
     room.onMessage(S2C.voicePeerLeft, (m: VoicePeerMessage) => this.voice.onPeerLeft(m));
     room.onMessage(S2C.voiceSignal, (m: VoiceSignalOut) => this.voice.onSignal(m));
+    room.onMessage(S2C.videoPeers, (m: VoicePeersMessage) => this.video.onPeers(m));
+    room.onMessage(S2C.videoPeerJoined, (m: VoicePeerMessage) => this.video.onPeerJoined(m));
+    room.onMessage(S2C.videoPeerLeft, (m: VoicePeerMessage) => this.video.onPeerLeft(m));
+    room.onMessage(S2C.videoSignal, (m: VoiceSignalOut) => this.video.onSignal(m));
     room.onStateChange(() => this.statePatched());
     room.onLeave((code, reason) => this.roomLeft(room, code, reason));
     room.onError((code, message) => console.warn(`Room error ${code}: ${message ?? ''}`));

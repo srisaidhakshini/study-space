@@ -39,7 +39,7 @@ import { checkMove, parseMove } from './movement';
 import { PlayerSession } from './session';
 import { cleanText, isFiniteNumber, isPlainObject } from './text';
 import { countRecords, deriveAnim, parseTimerConfig, rollDay, writeTimer } from './timers';
-import { VoiceHub } from './voice';
+import { VIDEO_CHANNEL, VoiceHub } from './voice';
 
 export interface RoomMeta {
   server: string;
@@ -62,6 +62,8 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
   private readonly sessions = new Map<string, PlayerSession>();
   private readonly voice = new VoiceHub(this.sessions);
+  /** Camera sharing between people sitting at study seats. */
+  private readonly video = new VoiceHub(this.sessions, VIDEO_CHANNEL);
   /** `${map}:${seatId}` -> session id of whoever sits there. */
   private readonly seats = new Map<string, string>();
   private serverName = '';
@@ -90,6 +92,9 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.onMessage(C2S.voiceJoin, (c) => this.withSession(c, (s) => this.voice.join(s)));
     this.onMessage(C2S.voiceLeave, (c) => this.voice.leave(c.sessionId));
     this.onMessage(C2S.voiceSignal, (c, m) => this.withSession(c, (s) => this.voice.signal(s, m, Date.now())));
+    this.onMessage(C2S.videoJoin, (c) => this.withSession(c, (s) => this.video.join(s)));
+    this.onMessage(C2S.videoLeave, (c) => this.video.leave(c.sessionId));
+    this.onMessage(C2S.videoSignal, (c, m) => this.withSession(c, (s) => this.video.signal(s, m, Date.now())));
 
     this.clock.setInterval(() => this.tick(), SERVER_TICK_MS);
   }
@@ -139,6 +144,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     if (!s) return;
     this.stand(s, Date.now(), false);
     this.voice.leave(client.sessionId);
+    this.video.leave(client.sessionId);
     this.sessions.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
   }
@@ -250,6 +256,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private stand(s: PlayerSession, now: number, notify: boolean): void {
     if (s.seatKey === null) return;
     this.endTimer(s, now);
+    this.video.leave(s.id);
     this.seats.delete(s.seatKey);
     s.seatKey = null;
     s.player.seatId = '';

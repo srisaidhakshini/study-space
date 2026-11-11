@@ -40,12 +40,14 @@ export const REPORT_REASON_MAX = 200;
 /** Most people allowed in one voice call. A full mesh needs n*(n-1)/2 links, so it is capped. */
 export const VOICE_MAX_PEERS = 12;
 /**
- * Largest SDP/ICE payload the server relays, in characters of JSON. Colyseus
- * closes a connection that sends more than 4096 bytes in one message, and an
- * audio-only SDP is about 1.5 KB, so this stays safely under that.
+ * Largest SDP/ICE payload the server relays, in characters of JSON. A video
+ * SDP can reach several KB, so the server's transport allows messages of up
+ * to SIGNAL_MAX_PAYLOAD bytes (Colyseus' default of 4096 is too small).
  */
-export const VOICE_SIGNAL_MAX_CHARS = 3500;
+export const VOICE_SIGNAL_MAX_CHARS = 12000;
 /** Signaling messages a player may send per second (ICE candidates arrive in bursts). */
+/** Largest single WebSocket message the game server accepts, in bytes. */
+export const SIGNAL_MAX_PAYLOAD = 16384;
 export const VOICE_SIGNAL_RATE = 60;
 
 /** What a remote character is doing. The client maps these to animations. */
@@ -152,6 +154,9 @@ export const C2S = {
   voiceJoin: 'voiceJoin',
   voiceLeave: 'voiceLeave',
   voiceSignal: 'voiceSignal',
+  videoJoin: 'videoJoin',
+  videoLeave: 'videoLeave',
+  videoSignal: 'videoSignal',
 } as const;
 
 /** A WebRTC session description or ICE candidate for one peer (relayed untouched). */
@@ -211,6 +216,10 @@ export const S2C = {
   voicePeerJoined: 'voicePeerJoined',
   voicePeerLeft: 'voicePeerLeft',
   voiceSignal: 'voiceSignal',
+  videoPeers: 'videoPeers',
+  videoPeerJoined: 'videoPeerJoined',
+  videoPeerLeft: 'videoPeerLeft',
+  videoSignal: 'videoSignal',
 } as const;
 
 /** Sent to someone who joins voice: who is already in the call. The joiner then sends each an offer. */
