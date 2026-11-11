@@ -98,12 +98,18 @@ export function loadMap(scene: Phaser.Scene, id: string): LoadedMap {
 }
 
 /**
- * Sets an integer zoom for crisp pixels and bounds the camera to the map,
+ * Sets an integer zoom for crisp pixels (larger for small rooms) and bounds the camera to the map,
  * centring maps that are smaller than the view.
  */
 export function fitCamera(camera: Phaser.Cameras.Scene2D.Camera, viewW: number, viewH: number, map: LoadedMap): void {
   // Whole-number zoom only: fractional zoom puts tile edges between screen pixels and draws seams.
-  const zoom = Phaser.Math.Clamp(Math.floor(Math.min(viewW / 480, viewH / 300)), 2, 6);
+  const base = Phaser.Math.Clamp(Math.floor(Math.min(viewW / 480, viewH / 300)), 2, 6);
+  // Small rooms get bigger: the largest whole zoom where the map still fits the width and is at most
+  // a quarter taller than the screen (the camera follows the player for the overflow).
+  let zoom = base;
+  for (let z = base + 1; z <= 6; z++) {
+    if (map.widthPx * z <= viewW && map.heightPx * z <= viewH * 1.25) zoom = z;
+  }
   camera.setSize(viewW, viewH);
   camera.setZoom(zoom);
   const visibleW = viewW / zoom;
