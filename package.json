@@ -1,0 +1,27 @@
+{
+  "name": "study-space",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A multiplayer pixel-art study world",
+  "workspaces": [
+    "shared",
+    "tools",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "assets": "npm run generate -w tools",
+    "dev": "npm run assets && npm run dev -w client",
+    "server": "npm run dev -w server",
+    "dev:all": "npm run assets && concurrently -n server,client -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run assets && npm run build -w client",
+    "preview": "npm run preview -w client",
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w tools && npm run typecheck -w server && npm run typecheck -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
