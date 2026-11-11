@@ -1,6 +1,7 @@
 import { REPORT_REASON_MAX } from '@study/shared';
 import { app } from '../app';
 import { bus } from '../bus';
+import { buddyPanel, buddyPeerAction } from '../studyTogether/BuddyPanel';
 import type { PlayerInfo } from '../net/types';
 import { button, h, setChildren } from './dom';
 import { openModal } from './modal';
@@ -28,6 +29,7 @@ export function openPlayers(root: HTMLElement): void {
   let unsubscribe: (() => void) | null = null;
 
   const list = h('div', { class: 'people-list' });
+  const buddies = h('div');
   const inviteLine = h('div', { class: 'row wrap people-invite' });
 
   const reasonInput = h('input', {
@@ -103,6 +105,7 @@ export function openPlayers(root: HTMLElement): void {
         h(
           'div',
           { class: 'people-buttons' },
+          buddyPeerAction(player),
           button(player.muted ? 'Unmute' : 'Mute', 'btn btn-small', () =>
             player.muted ? net?.unmute(player.id) : net?.mute(player.id),
           ),
@@ -139,6 +142,7 @@ export function openPlayers(root: HTMLElement): void {
         : null,
       ...players.map(row),
     );
+    buddies.replaceChildren(buddyPanel());
     if (hadFocus && pending?.kind === 'report') reasonInput.focus();
   }
 
@@ -150,6 +154,7 @@ export function openPlayers(root: HTMLElement): void {
       h('h2', { class: 'panel-title' }, 'People here'),
       inviteLine,
       list,
+      buddies,
       h('div', { class: 'panel-actions' }, button('Close', 'btn', () => close())),
     ),
     () => close(),
@@ -162,10 +167,12 @@ export function openPlayers(root: HTMLElement): void {
   }
 
   const offNet = getNet()?.changed.subscribe(render);
+  const offBuddies = app.net.buddiesChanged.subscribe(render);
   const offVoice = getNet()?.voice.changed.subscribe(render);
   unsubscribe = () => {
     offNet?.();
     offVoice?.();
+    offBuddies();
   };
   render();
 }

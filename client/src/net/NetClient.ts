@@ -1,6 +1,9 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
+  BUDDIES,
   C2S,
+  type BuddyAction,
+  type BuddyLinks,
   CHAT_MAX_LENGTH,
   REPORT_REASON_MAX,
   S2C,
@@ -78,6 +81,9 @@ function describe(error: unknown): string {
  */
 export class NetClient implements NetApi {
   readonly changed = new Emitter();
+  readonly buddiesChanged = new Emitter();
+  buddies: BuddyLinks = { links: [], online: {} };
+  buddyCandidates: ReadonlySet<string> = new Set();
   readonly questionBoard = new Emitter<QuestionBoardSnapshot>();
   readonly treeChanged = new Emitter();
   treeMinutes = 0;
@@ -285,6 +291,10 @@ export class NetClient implements NetApi {
     this.send<EmoteMessage>(C2S.emote, { name });
   }
 
+  sendBuddyAction(action: BuddyAction): void {
+    this.send(BUDDIES.action, action);
+  }
+
   sendBoardAction(action: BoardAction): void {
     this.send(STUDY_TOGETHER.boardAction, action);
   }
@@ -372,6 +382,9 @@ export class NetClient implements NetApi {
     this.roster = '';
     this.muted.clear();
     this.blocked.clear();
+    this.buddies = { links: [], online: {} };
+    this.buddyCandidates = new Set();
+    this.buddiesChanged.emit();
     this.voice.reset();
     this.video.reset();
     if (room) room.removeAllListeners();
@@ -384,6 +397,16 @@ export class NetClient implements NetApi {
     room.reconnection.enabled = false;
 
     const welcome = new Promise<WelcomeMessage>((resolve) => room.onMessage(S2C.welcome, (m: WelcomeMessage) => resolve(m)));
+    room.onMessage(BUDDIES.links, (view: BuddyLinks) => {
+      if (this.room !== room) return;
+      this.buddies = view;
+      this.buddiesChanged.emit();
+    });
+    room.onMessage(BUDDIES.candidates, (ids: string[]) => {
+      if (this.room !== room) return;
+      this.buddyCandidates = new Set(ids);
+      this.buddiesChanged.emit();
+    });
     room.onMessage(STUDY_TOGETHER.board, (message: QuestionBoardSnapshot) => this.questionBoard.emit(message));
     room.onMessage(STUDY_TOGETHER.tree, (minutes: number) => {
       if (!Number.isSafeInteger(minutes) || minutes < 0 || this.room !== room) return;

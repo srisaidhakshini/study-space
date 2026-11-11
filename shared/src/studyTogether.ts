@@ -61,3 +61,26 @@ export function buddySeat(seats: readonly SeatDef[], seat: SeatDef): SeatDef | u
   if (!left.includes(Math.min(x, seat.tx))) return undefined;
   return seats.find((candidate) => candidate.tx === x && candidate.ty === seat.ty && candidate.facing === seat.facing);
 }
+
+export const BUDDIES = {
+  action: 'buddyAction',
+  links: 'buddyLinks',
+  candidates: 'buddyCandidates',
+} as const;
+
+export type BuddyAction =
+  | { kind: 'request'; peerId: string }
+  | { kind: 'accept' | 'decline' | 'cancel' | 'remove'; linkId: string };
+
+export interface BuddyLink {
+  id: string;
+  name: string;
+  status: 'incoming' | 'outgoing' | 'accepted';
+  focusMinutes: number;
+}
+
+export interface BuddyLinks {
+  links: BuddyLink[];
+  /** Room session ids paired with opaque links. */
+  online: Record<string, string>;
+}

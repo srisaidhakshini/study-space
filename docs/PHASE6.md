@@ -13,3 +13,11 @@ Run the Phase 6 regression checks after generating assets:
 npm run assets
 node --import tsx --test server/src/studyTogether/studyTogether.test.ts
 ```
+
+## Buddy requests and private trees
+
+Sign in and open **People**. Choose **Request buddy** beside another signed-in player in your room. They can accept or decline under **Buddies**. Sending the request records your consent. The recipient’s acceptance creates the buddy relationship and its private tree.
+
+Requests and buddy trees stay on your account across reconnects. Tree growth uses the time both buddies are focusing in the same room instance. They can be at different seats or on different maps within that instance. The **Buddies** section shows each tree’s stage and shared focus minutes. Removing a buddy deletes the pair’s tree.
+
+Deploy the additive buddy migration with `npm run db:deploy -w server` before starting the updated server. Run the buddy integration test against a migrated test database with `node --import tsx --test server/src/studyTogether/buddies.test.ts`.
