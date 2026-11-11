@@ -12,6 +12,15 @@ function mapName(id: string): string {
   return app.manifest.maps[id]?.name ?? id;
 }
 
+/** Shows who is in the voice call with you and who is talking. */
+function voiceBadge(id: string): HTMLElement | null {
+  const peer = getNet()?.voice.peer(id);
+  if (!peer) return null;
+  if (peer.failed) return h('span', { class: 'badge badge-warn', attrs: { title: 'Could not connect audio (strict network?)' } }, 'No audio');
+  if (!peer.connected) return h('span', { class: 'badge', attrs: { title: 'Connecting audio' } }, 'Connecting…');
+  return h('span', { class: `badge badge-voice${peer.speaking ? ' speaking' : ''}` }, peer.speaking ? 'Speaking' : 'In call');
+}
+
 /** Lists the other players with mute, block and report actions. */
 export function openPlayers(root: HTMLElement): void {
   let pending: Pending = null;
@@ -87,6 +96,7 @@ export function openPlayers(root: HTMLElement): void {
           { class: 'people-who' },
           h('strong', { class: 'people-name' }, player.name),
           h('span', { class: 'hint' }, mapName(player.map)),
+          voiceBadge(player.id),
           player.muted ? h('span', { class: 'badge' }, 'Muted') : null,
           player.blocked ? h('span', { class: 'badge' }, 'Blocked') : null,
         ),
@@ -151,6 +161,11 @@ export function openPlayers(root: HTMLElement): void {
     modal.close();
   }
 
-  unsubscribe = getNet()?.changed.subscribe(render) ?? null;
+  const offNet = getNet()?.changed.subscribe(render);
+  const offVoice = getNet()?.voice.changed.subscribe(render);
+  unsubscribe = () => {
+    offNet?.();
+    offVoice?.();
+  };
   render();
 }

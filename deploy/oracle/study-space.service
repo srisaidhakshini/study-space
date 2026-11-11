@@ -1,0 +1,17 @@
+[Unit]
+Description=Study Space game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+WorkingDirectory=@APP_DIR@
+EnvironmentFile=/etc/study-space.env
+# Exactly one copy must run: rooms live in this process's memory.
+ExecStart=/usr/bin/npm run start -w server
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

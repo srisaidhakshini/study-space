@@ -22,8 +22,13 @@ import {
   type ServerListResponse,
   type SitResultMessage,
   type TeleportMessage,
+  type VoicePeerMessage,
+  type VoicePeersMessage,
+  type VoiceSignalOut,
   type WelcomeMessage,
 } from '@study/shared';
+import { createHmac } from 'node:crypto';
+import { iceConfig } from './api/ice';
 import { createServer } from './createServer';
 import { getWorld } from './world/maps';
 
@@ -148,6 +153,16 @@ async function main(): Promise<void> {
     const list = (await (await fetch(`${HTTP}/api/servers`)).json()) as ServerListResponse;
     check('(a) /api/servers lists 4 named servers', list.servers.length === 4 && list.servers.every((s) => s.capacity === CAPACITY));
 
+    // (j) ICE servers for voice
+    const ice = (await (await fetch(`${HTTP}/api/ice`)).json()) as { iceServers: { urls: string | string[]; username?: string }[] };
+    check('(j) /api/ice gives STUN and no TURN when none is configured', ice.iceServers.length === 1 && ice.iceServers[0]?.username === undefined);
+    const turn = iceConfig({ TURN_HOST: 'turn.example.com', TURN_SECRET: 's3cret' } as NodeJS.ProcessEnv, 1_000_000_000_000).iceServers[1];
+    const expectedName = `${1_000_000_000 + 12 * 3600}:study`;
+    check(
+      '(j) TURN credentials are an expiring HMAC of the shared secret',
+      turn?.username === expectedName && (turn as { credential?: string }).credential === createHmac('sha1', 's3cret').update(expectedName).digest('base64'),
+    );
+
     // (b) two clients, same server, see each other
     const a = track(await join('Maple', 'Alice'));
     const b = track(await join('Maple', 'Bob'));
@@ -182,6 +197,46 @@ async function main(): Promise<void> {
     );
     a.room.send(C2S.chat, { text: 'too fast' });
     check('(g) chat inside the cooldown is denied', await until(() => a.messages<{ reason: string }>(S2C.chatDenied).some((m) => m.reason === 'cooldown')));
+    // (i) voice signaling: join, relay offer/answer/candidate, membership and block rules, leave
+    const offer = { to: a.id, data: { kind: 'offer', sdp: 'v=0 test' } };
+    b.room.send(C2S.voiceSignal, offer);
+    await sleep(300);
+    check('(i) signals from someone not in the call are dropped', a.messages(S2C.voiceSignal).length === 0);
+    a.room.send(C2S.voiceJoin);
+    check('(i) the first voice member is told the call is empty', await until(() => a.messages<VoicePeersMessage>(S2C.voicePeers).some((m) => m.ids.length === 0)));
+    b.room.send(C2S.voiceJoin);
+    check('(i) a joiner is told who is already in the call', await until(() => b.messages<VoicePeersMessage>(S2C.voicePeers).some((m) => m.ids.includes(a.id))));
+    check('(i) existing members hear about the joiner', await until(() => a.messages<VoicePeerMessage>(S2C.voicePeerJoined).some((m) => m.id === b.id)));
+    b.room.send(C2S.voiceSignal, offer);
+    check(
+      '(i) an offer is relayed with the sender id',
+      await until(() => a.messages<VoiceSignalOut>(S2C.voiceSignal).some((m) => m.from === b.id && m.data.kind === 'offer')),
+    );
+    a.room.send(C2S.voiceSignal, { to: b.id, data: { kind: 'answer', sdp: 'v=0 answer' } });
+    a.room.send(C2S.voiceSignal, { to: b.id, data: { kind: 'candidate', candidate: { candidate: 'x', sdpMid: '0' } } });
+    check('(i) answers and ICE candidates are relayed', await until(() => b.messages<VoiceSignalOut>(S2C.voiceSignal).length === 2));
+    a.room.send(C2S.voiceSignal, { to: b.id, data: { kind: 'offer', sdp: 'x'.repeat(3_800) } });
+    a.room.send(C2S.voiceSignal, { to: b.id, data: { kind: 'bogus' } });
+    a.room.send(C2S.voiceSignal, { to: 'nobody', data: { kind: 'offer', sdp: 'v=0' } });
+    await sleep(300);
+    check('(i) oversized, malformed and misaddressed signals are dropped', b.messages(S2C.voiceSignal).length === 2);
+    b.room.send(C2S.block, { targetId: a.id });
+    await sleep(300);
+    a.room.send(C2S.voiceSignal, { to: b.id, data: { kind: 'offer', sdp: 'v=0 blocked' } });
+    b.room.send(C2S.voiceSignal, { to: a.id, data: { kind: 'offer', sdp: 'v=0 blocked' } });
+    await sleep(300);
+    check('(i) nothing is relayed between blocked players', b.messages(S2C.voiceSignal).length === 2 && a.messages(S2C.voiceSignal).length === 1);
+    a.room.send(C2S.voiceLeave);
+    b.room.send(C2S.voiceLeave);
+    b.room.send(C2S.unblock, { targetId: a.id });
+    await sleep(300);
+    a.room.send(C2S.voiceJoin);
+    b.room.send(C2S.voiceJoin);
+    await until(() => b.messages<VoicePeersMessage>(S2C.voicePeers).length === 2);
+    a.room.send(C2S.voiceLeave);
+    check('(i) leaving the call notifies the others', await until(() => b.messages<VoicePeerMessage>(S2C.voicePeerLeft).some((m) => m.id === a.id)));
+    b.room.send(C2S.voiceLeave);
+
     b.room.send(C2S.block, { targetId: a.id });
     await sleep(900);
     const before = b.messages(S2C.chat).length;

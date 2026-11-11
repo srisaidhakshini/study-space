@@ -36,6 +36,18 @@ export const CHAT_MAX_LENGTH = 140;
 export const CHAT_COOLDOWN_MS = 800;
 export const REPORT_REASON_MAX = 200;
 
+// Voice (WebRTC mesh; the room only relays signaling, audio goes peer to peer)
+/** Most people allowed in one voice call. A full mesh needs n*(n-1)/2 links, so it is capped. */
+export const VOICE_MAX_PEERS = 12;
+/**
+ * Largest SDP/ICE payload the server relays, in characters of JSON. Colyseus
+ * closes a connection that sends more than 4096 bytes in one message, and an
+ * audio-only SDP is about 1.5 KB, so this stays safely under that.
+ */
+export const VOICE_SIGNAL_MAX_CHARS = 3500;
+/** Signaling messages a player may send per second (ICE candidates arrive in bursts). */
+export const VOICE_SIGNAL_RATE = 60;
+
 /** What a remote character is doing. The client maps these to animations. */
 export const ANIM_STATES = ['idle', 'walk', 'sit', 'study', 'sleep', 'wave', 'stretch', 'drink'] as const;
 export type AnimState = (typeof ANIM_STATES)[number];
@@ -74,6 +86,11 @@ export interface JoinResponse {
 }
 export interface ApiError {
   error: string;
+}
+
+/** GET /api/ice: servers for WebRTC voice. TURN entries carry short-lived credentials. */
+export interface IceConfigResponse {
+  iceServers: { urls: string | string[]; username?: string; credential?: string }[];
 }
 
 /** Options passed to joinById. */
@@ -132,7 +149,21 @@ export const C2S = {
   report: 'report',
   block: 'block',
   unblock: 'unblock',
+  voiceJoin: 'voiceJoin',
+  voiceLeave: 'voiceLeave',
+  voiceSignal: 'voiceSignal',
 } as const;
+
+/** A WebRTC session description or ICE candidate for one peer (relayed untouched). */
+export type VoiceSignalData =
+  | { kind: 'offer'; sdp: string }
+  | { kind: 'answer'; sdp: string }
+  | { kind: 'candidate'; candidate: Record<string, unknown> | null };
+export interface VoiceSignalIn {
+  /** Session id of the peer this is for. */
+  to: string;
+  data: VoiceSignalData;
+}
 
 /** The player's own predicted position; the server validates it. */
 export interface MoveMessage {
@@ -176,7 +207,24 @@ export const S2C = {
   chatDenied: 'chatDenied',
   playAnim: 'playAnim',
   notice: 'notice',
+  voicePeers: 'voicePeers',
+  voicePeerJoined: 'voicePeerJoined',
+  voicePeerLeft: 'voicePeerLeft',
+  voiceSignal: 'voiceSignal',
 } as const;
+
+/** Sent to someone who joins voice: who is already in the call. The joiner then sends each an offer. */
+export interface VoicePeersMessage {
+  ids: string[];
+}
+/** Someone else joined or left the call (they will send you an offer after joining). */
+export interface VoicePeerMessage {
+  id: string;
+}
+export interface VoiceSignalOut {
+  from: string;
+  data: VoiceSignalData;
+}
 
 export interface WelcomeMessage {
   /** The player's own id (their session id). */
