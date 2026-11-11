@@ -1,0 +1,26 @@
+# Automatic HTTPS (Let's Encrypt) for the site; the game server stays on localhost.
+@DOMAIN@ {
+	encode gzip
+
+	# Game API, matchmaking and the room WebSocket go to the Node server.
+	@game {
+		path /api/* /matchmake/* /health
+	}
+	@socket {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	handle @game {
+		reverse_proxy 127.0.0.1:2567
+	}
+	handle @socket {
+		reverse_proxy 127.0.0.1:2567
+	}
+
+	# Everything else is the built client.
+	handle {
+		root * @APP_DIR@/client/dist
+		try_files {path} /index.html
+		file_server
+	}
+}

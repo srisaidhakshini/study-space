@@ -1,5 +1,6 @@
 import type { ChatDenyReason, Direction, ServerListEntry, WelcomeMessage } from '@study/shared';
 import type { Emitter } from '../state/emitter';
+import type { VoiceApi } from '../voice/types';
 
 /**
  * The public surface of the networking layer. The game and the HTML
@@ -27,6 +28,8 @@ export interface NetApi {
   readonly selfId: string;
   /** The welcome message of the current connection, or null when offline. */
   readonly welcome: WelcomeMessage | null;
+  /** Voice call with the others in the room. */
+  readonly voice: VoiceApi;
 
   /** Lists the named servers with live player counts. Throws a readable Error on failure. */
   fetchServers(): Promise<ServerListEntry[]>;

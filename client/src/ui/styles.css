@@ -800,6 +800,36 @@ canvas {
   color: #7d6b70;
 }
 
+/* ---------- Voice ---------- */
+
+.voice-group {
+  display: flex;
+  gap: 8px;
+}
+
+.mic.mic-on {
+  background: var(--cocoa);
+  color: var(--cream);
+}
+
+.mic.mic-speaking {
+  outline: 3px solid #7bd88f;
+  outline-offset: 1px;
+}
+
+.badge-voice {
+  background: #4f8f5f;
+}
+
+.badge-voice.speaking {
+  background: #7bd88f;
+  color: var(--ink);
+}
+
+.badge-warn {
+  background: #b5533c;
+}
+
 /* ---------- People ---------- */
 
 .people {

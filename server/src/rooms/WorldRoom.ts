@@ -48,6 +48,7 @@ import { checkMove, parseMove } from './movement';
 import { PlayerSession } from './session';
 import { cleanText, isFiniteNumber, isPlainObject } from './text';
 import { countRecords, deriveAnim, parseTimerConfig, rollDay, writeTimer } from './timers';
+import { VoiceHub } from './voice';
 
 export interface RoomMeta {
   server: string;
@@ -69,6 +70,7 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
   private readonly sessions = new Map<string, PlayerSession>();
+  private readonly voice = new VoiceHub(this.sessions);
   /** `${map}:${seatId}` -> session id of whoever sits there. */
   private readonly seats = new Map<string, string>();
   private serverName = '';
@@ -94,6 +96,9 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.onMessage(C2S.report, (c, m) => this.onReport(c, m));
     this.onMessage(C2S.block, (c, m) => this.onBlock(c, m, true));
     this.onMessage(C2S.unblock, (c, m) => this.onBlock(c, m, false));
+    this.onMessage(C2S.voiceJoin, (c) => this.withSession(c, (s) => this.voice.join(s)));
+    this.onMessage(C2S.voiceLeave, (c) => this.voice.leave(c.sessionId));
+    this.onMessage(C2S.voiceSignal, (c, m) => this.withSession(c, (s) => this.voice.signal(s, m, Date.now())));
 
     this.clock.setInterval(() => this.tick(), SERVER_TICK_MS);
   }
@@ -178,6 +183,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     const s = this.sessions.get(client.sessionId);
     if (!s) return;
     this.stand(s, serverConfig.now(), false);
+    this.voice.leave(client.sessionId);
     this.sessions.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
   }

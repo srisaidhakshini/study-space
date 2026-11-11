@@ -55,6 +55,7 @@ export function createHud(actions: HudActions): HTMLElement {
   };
   renderSettingsButton();
   app.settings.changed.subscribe(renderSettingsButton);
+  const voiceGroup = h('div', { class: 'voice-group' });
   const drinkBtn = button('Order a drink', 'btn btn-small', actions.openDrinkMenu, { title: 'Order a drink at the counter' });
   drinkBtn.hidden = true;
   const dock = h('div', { class: 'dock' });
@@ -76,6 +77,29 @@ export function createHud(actions: HudActions): HTMLElement {
       setChildren(connection, h('span', { class: 'dot' }), `${net.serverName} · ${count} online`);
       connection.title = `Invite code: ${net.inviteCode} (click to copy)`;
       peopleBtn.textContent = `People (${count})`;
+    }
+  };
+
+  const renderVoice = (): void => {
+    const net = getNet();
+    const voice = net?.voice;
+    voiceGroup.hidden = !net || net.status !== 'online' || !voice?.supported;
+    if (!voice || voiceGroup.hidden) return;
+    if (voice.state === 'off') {
+      setChildren(voiceGroup, button('Join voice', 'btn btn-small', () => void voice.join(), { title: 'Talk with everyone in this room' }));
+    } else if (voice.state === 'joining') {
+      setChildren(voiceGroup, button('Joining…', 'btn btn-small', () => undefined, { disabled: true }));
+    } else {
+      const mic = button(
+        voice.micOn ? 'Mic on' : voice.hasMic ? 'Mic muted' : 'Listening',
+        `btn btn-small mic${voice.micOn ? ' mic-on' : ''}${voice.selfSpeaking ? ' mic-speaking' : ''}`,
+        () => voice.toggleMic(),
+        {
+          title: voice.hasMic ? (voice.micOn ? 'Mute your microphone' : 'Unmute your microphone') : 'Allow the microphone to talk',
+          'aria-pressed': String(voice.micOn),
+        },
+      );
+      setChildren(voiceGroup, mic, button('Leave voice', 'btn btn-small', () => voice.leave(), { title: 'Leave the voice call' }));
     }
   };
 
@@ -204,6 +228,7 @@ export function createHud(actions: HudActions): HTMLElement {
         { class: 'hud-actions' },
         today,
         coins,
+        voiceGroup,
         drinkBtn,
         peopleBtn,
         button('Servers', 'btn btn-small', actions.openServers, { title: 'Choose a server' }),
@@ -248,8 +273,11 @@ export function createHud(actions: HudActions): HTMLElement {
   watchNet(() => {
     renderConnection();
     renderToday();
+    renderVoice();
   });
+  getNet()?.voice.changed.subscribe(renderVoice);
   renderAccount();
+  renderToday();
   renderDock();
   return hud;
 }

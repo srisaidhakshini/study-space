@@ -9,6 +9,7 @@ import {
   type ChatDeniedMessage,
   type ChatMessageIn,
   type ChatMessageOut,
+  type IceConfigResponse,
   type CorrectMessage,
   type DoorMessage,
   type EmoteMessage,
@@ -33,12 +34,16 @@ import {
   type TimerConfig,
   type TimerEvent,
   type TimerEventMessage,
+  type VoicePeerMessage,
+  type VoicePeersMessage,
+  type VoiceSignalOut,
   type WelcomeMessage,
 } from '@study/shared';
 import { bus } from '../bus';
 import { Emitter } from '../state/emitter';
 import { AuthRejectedError } from './errors';
 import { serverBase, tzOffsetMin, UNREACHABLE } from './http';
+import { VoiceClient } from '../voice/VoiceClient';
 import type { ChatLine, NetApi, NetStatus, PlayerInfo } from './types';
 
 const WELCOME_TIMEOUT_MS = 4000;
@@ -98,6 +103,13 @@ export class NetClient implements NetApi {
 
   /** Set by app.ts once the account store exists, so this file does not depend on it. */
   auth: { token(): string | null; rejected(): void } | null = null;
+  /** Voice call for the current room. Ends by itself when the room is left. */
+  readonly voice = new VoiceClient(
+    { send: (type, payload) => this.send(type, payload) },
+    (id) => this.muted.has(id) || this.blocked.has(id),
+    (id) => this.blocked.has(id),
+    () => this.fetchIce(),
+  );
 
   constructor(private readonly getProfile: () => Profile | null) {}
 
@@ -175,23 +187,27 @@ export class NetClient implements NetApi {
 
   mute(id: string): void {
     this.muted.add(id);
+    this.voice.refreshSilenced();
     this.changed.emit();
   }
 
   unmute(id: string): void {
     this.muted.delete(id);
+    this.voice.refreshSilenced();
     this.changed.emit();
   }
 
   block(id: string): void {
     this.blocked.add(id);
     this.send<BlockMessage>(C2S.block, { targetId: id });
+    this.voice.drop(id);
     this.changed.emit();
   }
 
   unblock(id: string): void {
     this.blocked.delete(id);
     this.send<BlockMessage>(C2S.unblock, { targetId: id });
+    this.voice.refreshSilenced();
     this.changed.emit();
   }
 
@@ -247,6 +263,16 @@ export class NetClient implements NetApi {
   }
 
   // ---- Internals ---------------------------------------------------------
+
+  /** STUN/TURN servers for a voice call, from the game server. Null if it cannot be reached. */
+  private async fetchIce(): Promise<RTCIceServer[] | null> {
+    try {
+      const body = await this.api<IceConfigResponse>('/api/ice');
+      return body.iceServers as RTCIceServer[];
+    } catch {
+      return null;
+    }
+  }
 
   private setStatus(status: NetStatus): void {
     if (this.status === status) return;
@@ -315,6 +341,7 @@ export class NetClient implements NetApi {
     this.roster = '';
     this.muted.clear();
     this.blocked.clear();
+    this.voice.reset();
     if (room) room.removeAllListeners();
   }
 
@@ -335,6 +362,10 @@ export class NetClient implements NetApi {
     room.onMessage(S2C.notice, (m: NoticeMessage) => bus.emit('toast', { text: m.text }));
     room.onMessage(S2C.chatDenied, (m: ChatDeniedMessage) => bus.emit('chat:denied', { reason: m.reason }));
     room.onMessage(S2C.chat, (m: ChatMessageOut) => this.receiveChat(m));
+    room.onMessage(S2C.voicePeers, (m: VoicePeersMessage) => this.voice.onPeers(m));
+    room.onMessage(S2C.voicePeerJoined, (m: VoicePeerMessage) => this.voice.onPeerJoined(m));
+    room.onMessage(S2C.voicePeerLeft, (m: VoicePeerMessage) => this.voice.onPeerLeft(m));
+    room.onMessage(S2C.voiceSignal, (m: VoiceSignalOut) => this.voice.onSignal(m));
     room.onStateChange(() => this.statePatched());
     room.onLeave((code, reason) => this.roomLeft(room, code, reason));
     room.onError((code, message) => console.warn(`Room error ${code}: ${message ?? ''}`));

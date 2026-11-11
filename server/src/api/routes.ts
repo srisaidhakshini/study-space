@@ -11,6 +11,7 @@ import {
 import { serverConfig } from '../config';
 import { dbStatus } from '../db/client';
 import type { RoomMeta } from '../rooms/WorldRoom';
+import { iceRoute } from './ice';
 import { isValidInviteCode, normalizeInviteCode, randomInviteCode } from './inviteCodes';
 
 type RoomListing = IRoomCache<RoomMeta>;
@@ -110,4 +111,5 @@ export function registerRoutes(app: Application): void {
   }));
   app.get('/api/servers', safe(listServers));
   app.post('/api/join', safe(join));
+  app.get('/api/ice', iceRoute);
 }
