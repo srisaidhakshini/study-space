@@ -56,8 +56,12 @@ export function createGame(parent: HTMLElement): GameHandle {
   let resizeFrame = 0;
   let resizeTimer = 0;
   const syncSize = (): void => {
-    game.scale.resize(window.innerWidth, window.innerHeight);
-    game.scale.refresh();
+    try {
+      game.scale.resize(window.innerWidth, window.innerHeight);
+      game.scale.refresh();
+    } catch (error) {
+      console.warn('Resize failed; will retry on the next resize', error);
+    }
   };
   const resync = (): void => {
     window.cancelAnimationFrame(resizeFrame);

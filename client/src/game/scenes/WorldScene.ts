@@ -193,7 +193,13 @@ export class WorldScene extends Phaser.Scene {
 
   private setupCamera(): void {
     const camera = this.cameras.main;
-    const fit = (): void => fitCamera(camera, this.scale.width, this.scale.height, this.map);
+    // A resize can arrive while the scene is shutting down or restarting (its camera is already
+    // destroyed then); touching that camera throws and, from the render loop, would freeze the canvas.
+    const fit = (): void => {
+      const status = this.sys.settings.status;
+      if (status === Phaser.Scenes.SHUTDOWN || status === Phaser.Scenes.DESTROYED || !this.cameras?.main) return;
+      fitCamera(this.cameras.main, this.scale.width, this.scale.height, this.map);
+    };
     fit();
     camera.setRoundPixels(true);
     camera.startFollow(this.player, true, 0.2, 0.2);
@@ -201,6 +207,7 @@ export class WorldScene extends Phaser.Scene {
     camera.fadeIn(FADE_MS, 42, 27, 46);
     this.scale.on(Phaser.Scale.Events.RESIZE, fit);
     this.cleanup.push(() => this.scale.off(Phaser.Scale.Events.RESIZE, fit));
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => this.scale.off(Phaser.Scale.Events.RESIZE, fit));
   }
 
   private setupInput(): void {

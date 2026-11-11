@@ -3,8 +3,8 @@ import { getNet, watchNet } from './netAccess';
 
 /**
  * Camera panel, open to everyone in the room like voice. It offers "Start
- * camera", then shows a tile for everyone else on camera. Clicking a tile (or "Expand")
- * opens every tile together in a full-screen view.
+ * camera", then shows a tile for everyone else on camera. Clicking any tile opens every
+ * tile together in a full-screen view.
  */
 export function createVideoDock(): HTMLElement {
   const dock = h('div', { class: 'video-dock' });
@@ -87,7 +87,6 @@ export function createVideoDock(): HTMLElement {
     const controls = h(
       'div',
       { class: 'video-controls' },
-      button('Expand', 'btn btn-small', () => setExpanded(true), { title: 'Show everyone full screen' }),
       button(video.camOn ? 'Pause camera' : 'Resume camera', 'btn btn-small', () => video.toggleCam(), { 'aria-pressed': String(video.camOn) }),
       button('Stop video', 'btn btn-small', () => video.leave(), { title: 'Stop sharing and close video' }),
     );

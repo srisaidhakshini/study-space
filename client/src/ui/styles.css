@@ -326,6 +326,42 @@ canvas {
   background: #e4efc9;
 }
 
+/* While a timer runs the dock is a slim bar: label, clock and buttons in one row. */
+.dock-focus,
+.dock-break {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  max-width: min(96vw, 560px);
+  padding: 6px 12px 8px;
+}
+
+.dock-focus.dock-confirm,
+.dock-break.dock-confirm {
+  flex-direction: column;
+  padding: 8px 18px 12px;
+}
+
+.dock-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dock-info .phase {
+  font-size: 13px;
+}
+
+.dock-info .cycle {
+  font-size: 12px;
+}
+
+.dock-focus .clock,
+.dock-break .clock {
+  font-size: 34px;
+}
+
 .phase {
   font-size: 16px;
   font-weight: 600;
