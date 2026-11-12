@@ -16,7 +16,7 @@ const SELF = 'self';
  * Camera panel, open to everyone in the room like voice. "Start camera" opens it:
  * one tile per person, each resizable by dragging its bottom-left corner. A small
  * menu in the top-right corner maximizes (every tile full screen), minimizes the
- * panel to a pill, pauses your camera or stops video. Clicking a tile maximizes too.
+ * panel to a pill, pauses your camera or stops video.
  */
 export function createVideoDock(): HTMLElement {
   const dock = h('div', { class: 'video-dock' });
@@ -186,7 +186,6 @@ export function createVideoDock(): HTMLElement {
     const tiles = entries.map((e) => {
       const el = tile(e.name, e.stream, e.self, e.off);
       el.style.setProperty('--w', `${widths.get(e.id) ?? defaultW}px`);
-      el.addEventListener('click', () => setExpanded(true));
       el.append(resizeHandle(e.id, el));
       return el;
     });

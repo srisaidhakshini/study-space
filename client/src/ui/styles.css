@@ -1551,7 +1551,6 @@ canvas {
   border: 3px solid var(--ink);
   border-radius: 6px;
   overflow: hidden;
-  cursor: zoom-in;
 }
 
 /* Tiles in the corner panel are 4:3 at the width you chose (--w). */
@@ -1637,14 +1636,26 @@ canvas {
   min-width: 0;
   padding: 2px 7px;
   font-size: 11px;
-  opacity: 0.85;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
 
-.video-menu-btn:hover {
+/* Hidden until you point at the video (or while its menu is open or focused). */
+.video-dock:hover .video-menu-btn,
+.video-menu-btn:focus-visible,
+.video-menu-btn[aria-expanded='true'] {
   opacity: 1;
 }
 
+/* Touch screens have no hover, so the button stays visible there. */
+@media (hover: none) {
+  .video-menu-btn {
+    opacity: 0.85;
+  }
+}
+
 .video-menu-btn.video-menu-pill {
+  opacity: 1;
   position: static;
   font-size: 13px;
   padding: 4px 10px;
@@ -1684,10 +1695,6 @@ canvas {
 
 .video-root {
   display: contents;
-}
-
-.video-tile {
-  cursor: zoom-in;
 }
 
 .video-big {
