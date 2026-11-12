@@ -12,7 +12,8 @@ import { ALL_AUDIO, AREA_SOUNDS } from './audio/areaSounds';
 import { renderAllFurnitureImages } from './furniture';
 import { SR } from './audio/dsp';
 import { writeWav } from './audio/wav';
-import type { PixelCanvas } from './png';
+import { PixelCanvas } from './png';
+import { sharedTree } from './tiles/gardenTiles';
 import type { Tileset } from './tiles/tileset';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -91,6 +92,10 @@ image(FX_KEYS.zzz, 'fx/zzz.png', renderZzz());
 sheet(FX_KEYS.dust, 'fx/dust.png', renderDust(), 8, 8);
 sheet(FX_KEYS.subjectIcons, 'fx/subject_icons.png', renderSubjectIcons(), 10, 10);
 sheet(FX_KEYS.lamp, 'fx/lamp.png', renderLamp(), 16, 16);
+
+const buddyTree = new PixelCanvas(6 * TILE, 6 * TILE);
+sharedTree(buddyTree);
+image('buddy_tree', 'fx/buddy_tree.png', buddyTree);
 
 // Furniture, wallpapers, floors and the baseboard for player homes
 for (const f of renderAllFurnitureImages()) image(f.key, f.path, f.canvas);

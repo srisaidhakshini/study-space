@@ -1,0 +1,11 @@
+.git
+.claude
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/*.log
+**/.study-tree.json*
+client/public/assets
+server/src/generated
+tools/preview

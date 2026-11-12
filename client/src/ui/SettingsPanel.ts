@@ -1,15 +1,17 @@
 import { app } from '../app';
+import { bus } from '../bus';
 import type { Settings } from '../state/settings';
 import { button, h } from './dom';
 import { openModal } from './modal';
 
-type VolumeKey = 'master' | 'music' | 'ambience';
+type VolumeKey = 'master' | 'music' | 'ambience' | 'alerts';
 type ToggleKey = 'muted' | 'rain' | 'dayNight';
 
 const VOLUMES: { key: VolumeKey; label: string; note: string }[] = [
   { key: 'master', label: 'Master volume', note: 'Everything' },
   { key: 'music', label: 'Music', note: 'Lo-fi background music' },
   { key: 'ambience', label: 'Ambience', note: 'Birds, water, room tone, rain' },
+  { key: 'alerts', label: 'Timer alerts', note: 'Chime when a focus session or a break ends' },
 ];
 
 const TOGGLES: { key: ToggleKey; label: string; note: string }[] = [
@@ -31,6 +33,8 @@ function volumeRow(key: VolumeKey, label: string, note: string): Row {
     attrs: { type: 'range', id, min: 0, max: 100, step: 1, 'aria-label': label },
   });
   input.addEventListener('input', () => app.settings.update({ [key]: Number(input.value) / 100 }));
+  // Letting go of the alert slider plays the chime so the level can be judged.
+  if (key === 'alerts') input.addEventListener('change', () => bus.emit('ui:alertPreview'));
   const el = h(
     'div',
     { class: 'setting-row' },

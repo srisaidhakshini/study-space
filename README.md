@@ -3,7 +3,7 @@
 A cozy pixel-art world for studying together: walk around as a chibi
 character, sit at a desk, and run a focus timer that floats above your head.
 
-**Status: phases 1–6 of 7, plus voice and video.** Study Space has multiplayer, nine public maps, accounts and focus stats, player homes with a furniture shop, and room-wide WebRTC calls. Phase 6 adds the shared Garden tree, Library buddy desks, private buddy trees, player local times, the focus ghost, and subject question boards. See [Phase 6 features](docs/PHASE6.md).
+**Status: phases 1–6 of 7, plus voice and video; phase 7 (polish) is under way, starting with a touch joystick on phones and tablets.** Study Space has multiplayer, nine public maps, accounts and focus stats, player homes with a furniture shop, and room-wide WebRTC calls. Phase 6 adds the shared Garden tree, Library buddy desks, private buddy trees, player local times, the focus ghost, and subject question boards. See [Phase 6 features](docs/PHASE6.md).
 
 ## Run it
 

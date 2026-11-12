@@ -13,6 +13,8 @@ export function createVideoDock(): HTMLElement {
 
   // Full-screen view of all tiles. It sits outside the dock so it survives the dock re-rendering.
   let expanded = false;
+  // Minimized: the camera stays on, but the tiles collapse into one small button.
+  let minimized = false;
   const bigGrid = h('div', { class: 'video-big-grid' });
   const overlay = h(
     'div',
@@ -84,13 +86,19 @@ export function createVideoDock(): HTMLElement {
     for (const el of small) el.addEventListener('click', () => setExpanded(true));
     // The tile size and column count follow how many people are on camera (see .video-dock[data-count]).
     dock.dataset.count = String(Math.min(small.length, 8));
+    const grid = h('div', { class: 'video-grid' }, ...small);
+    grid.hidden = minimized;
     const controls = h(
       'div',
       { class: 'video-controls' },
+      button(minimized ? `Show video (${small.length})` : 'Minimize', 'btn btn-small', () => {
+        minimized = !minimized;
+        render();
+      }, { title: minimized ? 'Show the video tiles' : 'Shrink video to a small button; your camera stays on', 'aria-expanded': String(!minimized) }),
       button(video.camOn ? 'Pause camera' : 'Resume camera', 'btn btn-small', () => video.toggleCam(), { 'aria-pressed': String(video.camOn) }),
       button('Stop video', 'btn btn-small', () => video.leave(), { title: 'Stop sharing and close video' }),
     );
-    setChildren(dock, h('div', { class: 'video-grid' }, ...small), controls);
+    setChildren(dock, grid, controls);
 
     overlay.hidden = !expanded;
     if (expanded) {

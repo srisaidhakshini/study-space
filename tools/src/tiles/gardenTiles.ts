@@ -76,7 +76,7 @@ function bed(set: Tileset): void {
   });
 }
 
-function sharedTree(c: PixelCanvas): void {
+export function sharedTree(c: PixelCanvas): void {
   const rand = makeRng(404);
   const W = c.width;
   c.ellipse(48, 89, 26, 6, withAlpha(PAL.ink, 0.3));

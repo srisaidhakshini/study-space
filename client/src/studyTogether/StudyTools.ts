@@ -11,6 +11,7 @@ import { app } from '../app';
 import { bus } from '../bus';
 import { button, h } from '../ui/dom';
 import { openModal } from '../ui/modal';
+import { homeBuddyTrees } from './HomeBuddyTrees';
 import { focusGhostEnabled, setFocusGhost, studyDeskStatus } from './preferences';
 import './studyTools.css';
 
@@ -26,8 +27,11 @@ export function createStudyTools(root: HTMLElement): HTMLElement {
     desk.textContent = status;
   });
 
+  const ownHome = (): boolean => map.startsWith('home_') && app.homes.info?.mine === true;
   const updateVisibility = (): void => {
-    study.hidden = map !== 'garden' && map !== 'library' && !(app.net.online && hasQuestionBoard(map));
+    const atHome = ownHome();
+    study.textContent = atHome ? 'Buddy trees' : 'Study together';
+    study.hidden = !atHome && map !== 'garden' && map !== 'library' && !(app.net.online && hasQuestionBoard(map));
   };
   bus.on('location', ({ mapId, zone }) => {
     if (mapId !== map) closePanel?.();
@@ -36,10 +40,11 @@ export function createStudyTools(root: HTMLElement): HTMLElement {
     updateVisibility();
   });
   app.net.changed.subscribe(updateVisibility);
+  app.homes.changed.subscribe(updateVisibility);
 
   function open(): void {
     if (closePanel) return;
-    const title = h('h2', { attrs: { id: 'study-together-title' } }, 'Study together');
+    const title = h('h2', { attrs: { id: 'study-together-title' } }, ownHome() ? 'Buddy trees' : 'Study together');
     const panel = h('section', {
       class: 'panel study-together',
       attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': title.id },
@@ -56,6 +61,7 @@ export function createStudyTools(root: HTMLElement): HTMLElement {
       if (!study.hidden) study.focus();
     }
 
+    if (ownHome()) panel.append(homeBuddyTrees(off));
     if (openedMap === 'garden') {
       const tree = h('section', { class: 'study-section' });
       const render = (): void => renderTree(tree);

@@ -1,0 +1,26 @@
+.home-buddy-tree-preview {
+  display: grid;
+  grid-template-columns: minmax(6rem, 10rem) 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.home-buddy-tree-art {
+  aspect-ratio: 1;
+  display: flex;
+  justify-content: center;
+  align-items: end;
+  background: #e8e8c3;
+  border: 2px solid var(--ink);
+}
+
+.home-buddy-tree-art img {
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.home-buddy-tree-details {
+  display: grid;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}

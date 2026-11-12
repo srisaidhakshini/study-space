@@ -15,6 +15,8 @@ export interface BusEvents {
   'seat:near': { available: boolean };
   /** UI -> Game: sit on the nearest free seat. */
   'ui:sit': undefined;
+  /** UI -> Audio: play the timer chime once so the alert volume can be judged. */
+  'ui:alertPreview': undefined;
   /** UI -> Game: stand up (the timer service ends any running session). */
   'ui:stand': undefined;
   /** UI -> Game: play an emote on the player's character. */

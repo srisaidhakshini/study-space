@@ -1674,3 +1674,147 @@ canvas {
   font-size: 14px;
   padding: 3px 8px;
 }
+
+/* ---------- Touch joystick ---------- */
+.joystick {
+  position: fixed;
+  left: max(20px, env(safe-area-inset-left));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: rgba(251, 245, 234, 0.28);
+  border: 3px solid rgba(42, 27, 46, 0.55);
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 40;
+}
+.joystick[hidden],
+.joystick.locked {
+  display: none;
+}
+.joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* ---------- Touch layout ---------- */
+/* The joystick owns the bottom-left corner: chat rises above it and the timer dock moves right. */
+@media (pointer: coarse) {
+  .chat {
+    bottom: calc(168px + env(safe-area-inset-bottom));
+    width: min(320px, calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  }
+
+  .dock {
+    align-self: flex-end;
+    max-width: calc(100vw - 168px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
+  .dock-focus,
+  .dock-break {
+    max-width: calc(100vw - 168px - env(safe-area-inset-left) - env(safe-area-inset-right));
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .btn,
+  .input,
+  .stepper-value {
+    min-height: 44px;
+  }
+
+  .btn-small {
+    min-height: 40px;
+  }
+
+  .btn-icon {
+    min-width: 44px;
+  }
+}
+
+/* Landscape phones: a smaller joystick and a shorter chat leave room for the world. */
+@media (pointer: coarse) and (max-height: 500px) {
+  .joystick {
+    width: 108px;
+    height: 108px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .chat {
+    bottom: calc(132px + env(safe-area-inset-bottom));
+    width: min(260px, 40vw);
+  }
+
+  .chat-log {
+    max-height: 70px;
+  }
+
+  .dock {
+    max-width: calc(100vw - 148px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+}
+
+.video-grid[hidden] {
+  display: none;
+}
+
+/* ---------- HUD menu ---------- */
+.hud-menu-wrap {
+  position: relative;
+}
+.hud-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 190px;
+  padding: 8px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 0 5px 0 var(--ink);
+  pointer-events: auto;
+}
+.hud-menu[hidden] {
+  display: none;
+}
+.hud-menu .btn,
+.hud-menu .chip {
+  justify-content: flex-start;
+  text-align: left;
+  box-shadow: none;
+}
+.hud-menu .btn-label {
+  position: static;
+  width: auto;
+  height: auto;
+  clip: auto;
+}
+.btn-menu.has-badge::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 12px;
+  height: 12px;
+  background: var(--coral);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+.btn-menu {
+  position: relative;
+}

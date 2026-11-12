@@ -228,6 +228,42 @@ export function createHud(actions: HudActions): HTMLElement {
     );
   };
 
+  // Everything that is not needed all the time lives in the Menu.
+  const menuBtn = button('Menu', 'btn btn-small btn-menu', () => setMenu(menuPanel.hidden), {
+    title: 'More: stats, home, friends, servers, character, settings',
+    'aria-haspopup': 'true',
+    'aria-expanded': 'false',
+  });
+  const menuPanel = h(
+    'div',
+    { class: 'hud-menu', attrs: { role: 'menu' } },
+    today,
+    coins,
+    homeBtn,
+    editHomeBtn,
+    friendsBtn,
+    button('Servers', 'btn btn-small', actions.openServers, { title: 'Choose a server' }),
+    button('Character', 'btn btn-small', actions.openCreator, { title: 'Edit your character' }),
+    settingsBtn,
+  );
+  menuPanel.hidden = true;
+  const menuWrap = h('div', { class: 'hud-menu-wrap' }, menuBtn, menuPanel);
+  const setMenu = (open: boolean): void => {
+    menuPanel.hidden = !open;
+    menuBtn.setAttribute('aria-expanded', String(open));
+    menuBtn.classList.toggle('active', open);
+  };
+  // Choosing anything, clicking elsewhere or pressing Escape closes the menu.
+  menuPanel.addEventListener('click', (event) => {
+    if ((event.target as HTMLElement).closest('button')) setMenu(false);
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!menuPanel.hidden && !menuWrap.contains(event.target as Node)) setMenu(false);
+  });
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !menuPanel.hidden) setMenu(false);
+  });
+
   const hud = h(
     'div',
     { class: 'hud' },
@@ -238,19 +274,12 @@ export function createHud(actions: HudActions): HTMLElement {
       h(
         'div',
         { class: 'hud-actions' },
-        today,
-        coins,
         voiceGroup,
         drinkBtn,
-        editHomeBtn,
-        homeBtn,
-        friendsBtn,
         peopleBtn,
         actions.studyTools,
-        button('Servers', 'btn btn-small', actions.openServers, { title: 'Choose a server' }),
         button('Wave', 'btn btn-small', () => bus.emit('ui:emote', { name: 'wave' }), { title: 'Wave hello' }),
-        button('Character', 'btn btn-small', actions.openCreator, { title: 'Edit your character' }),
-        settingsBtn,
+        menuWrap,
       ),
     ),
     dock,
@@ -306,6 +335,7 @@ export function createHud(actions: HudActions): HTMLElement {
       h('span', { class: 'btn-label' }, 'Friends'),
       waiting > 0 ? h('span', { class: 'dot-badge', attrs: { 'aria-hidden': 'true' } }, String(waiting)) : null,
     );
+    menuBtn.classList.toggle('has-badge', waiting > 0);
     friendsBtn.title = waiting > 0 ? `Friends (${waiting} request${waiting === 1 ? '' : 's'} waiting)` : 'Friends';
     friendsBtn.setAttribute('aria-label', waiting > 0 ? `Friends, ${waiting} request${waiting === 1 ? '' : 's'} waiting` : 'Friends');
   };

@@ -1,0 +1,45 @@
+services:
+  app:
+    image: study-space:local
+    build: .
+    restart: unless-stopped
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env.production}
+      DATABASE_URL: postgresql://study:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@db:5432/study_space?schema=public
+      STUDY_TREE_FILE: /app/data/study-tree.json
+      TURN_HOST: ${TURN_HOST:-}
+      TURN_SECRET: ${TURN_SECRET:-}
+    command: ["sh", "-ec", "npm run db:deploy -w server && exec node --import tsx server/src/index.ts"]
+    ports:
+      - "127.0.0.1:${STUDY_HTTP_PORT:-2567}:2567"
+    volumes:
+      - garden:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2567/health').then(r => { if (!r.ok) process.exitCode = 1 }).catch(() => { process.exitCode = 1 })"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: study
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: study_space
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U study -d study_space"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  garden:
+  postgres:

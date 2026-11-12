@@ -84,6 +84,11 @@ export class AudioManager {
       this.updateRain();
     });
     app.timer.changed.subscribe(() => this.applyVolumes(false));
+    app.timer.events.subscribe((event) => {
+      if (event === 'focusDone') this.chime([659.25, 783.99, 1046.5]); // rising: time for a break
+      else if (event === 'breakDone') this.chime([783.99, 587.33]); // falling: back to work
+    });
+    bus.on('ui:alertPreview', () => this.chime([659.25, 783.99, 1046.5]));
     window.setInterval(() => this.updateRain(), WEATHER_CHECK_MS);
     document.addEventListener('visibilitychange', () => this.onVisibility());
     window.addEventListener('keydown', (event) => this.onKey(event));
@@ -232,6 +237,36 @@ export class AudioManager {
   }
 
   // ---- Volumes and rain -------------------------------------------------------------
+
+  /**
+   * Plays a short bell arpeggio at the alert volume, through the master bus
+   * (so muting silences it). It wakes the audio context so a chime still
+   * sounds when the tab is in the background.
+   */
+  private chime(notes: number[]): void {
+    const ctx = this.ctx;
+    const volume = app.settings.get().alerts;
+    if (!ctx || !this.unlocked || volume <= 0) return;
+    void ctx.resume().catch(() => undefined).then(() => {
+      const start = ctx.currentTime + 0.05;
+      notes.forEach((freq, i) => {
+        const at = start + i * 0.22;
+        for (const [mult, level] of [[1, 1], [2.01, 0.3]] as const) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq * mult;
+          const peak = 0.35 * volume * level;
+          gain.gain.setValueAtTime(0.0001, at);
+          gain.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0001), at + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, at + 1.1);
+          osc.connect(gain).connect(this.master);
+          osc.start(at);
+          osc.stop(at + 1.2);
+        }
+      });
+    });
+  }
 
   private focusing(): boolean {
     return app.timer.state.phase === 'focus';

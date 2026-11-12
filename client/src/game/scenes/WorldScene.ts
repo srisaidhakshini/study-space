@@ -21,6 +21,7 @@ import { DEPTH, SCENES } from '../depths';
 import { HomeEditor } from '../home/HomeEditor';
 import { HomeView } from '../home/HomeView';
 import { StreetView } from '../home/StreetView';
+import { joystick } from '../../ui/Joystick';
 import { PlayerController } from '../player/PlayerController';
 import { RemotePlayers } from '../remote/RemotePlayers';
 import { Sky } from '../sky/Sky';
@@ -253,6 +254,10 @@ export class WorldScene extends Phaser.Scene {
       const k = this.keys;
       axisX = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
       axisY = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
+      if (axisX === 0 && axisY === 0) {
+        axisX = joystick.x;
+        axisY = joystick.y;
+      }
     }
 
     if (!this.travelling) this.controller.update(dt, axisX, axisY);
