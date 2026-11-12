@@ -456,10 +456,27 @@ async function main(): Promise<void> {
     // send the extra visitors back out
     for (const p of [cPlayer, guest]) await useDoor(p, 'exit');
 
+    const bed = homeSeats(homeOf(a1) as unknown as HomeLayout).find((spot) => spot.kind === 'bed')!;
+    await walkNextTo(bPlayer, bed.tx, bed.ty);
+    const nap = await ask<{ ok: boolean }>(bPlayer, () => bPlayer.room.send(C2S.sit, { seatId: bed.id }), S2C.sitResult);
+    check('a visitor can sleep in the starter bed', nap[0]?.ok === true && (await until(() => bPlayer.snapshot()?.anim === 'sleep')));
+    await walkNextTo(a1, bed.tx, bed.ty);
+    const full = await ask<{ ok: boolean; reason?: string }>(a1, () => a1.room.send(C2S.sit, { seatId: bed.id }), S2C.sitResult);
+    check('a single bed is full with one sleeper', full[0]?.ok === false && full[0]?.reason === 'taken');
+    bPlayer.room.send(C2S.timerStart, { mode: 'stopwatch', focusMin: 25, breakMin: 5, subject: 'math' });
+    await sleep(300);
+    check('sleeping does not start a focus timer', bPlayer.snapshot()?.phase === 'idle');
+    await ask(bPlayer, () => bPlayer.room.send(C2S.stand), S2C.teleport);
+    sync(bPlayer);
+    const reused = await ask<{ ok: boolean }>(a1, () => a1.room.send(C2S.sit, { seatId: bed.id }), S2C.sitResult);
+    check('getting up frees the bed', reused[0]?.ok === true);
+    await ask(a1, () => a1.room.send(C2S.stand), S2C.teleport);
+    sync(a1);
+
     // ---- visitors follow layout changes -----------------------------------------------------------------------
     const seatsNow = homeSeats(homeOf(a1) as unknown as HomeLayout);
     check('a home with a desk offers a seat to visitors', seatsNow.length >= 1);
-    const seat = seatsNow[0]!;
+    const seat = seatsNow.find((spot) => spot.kind === 'chair')!;
     await walkNextTo(bPlayer, seat.tx, seat.ty);
     const sitReply = await ask<{ ok: boolean; seatId: string }>(bPlayer, () => bPlayer.room.send(C2S.sit, { seatId: seat.id }), S2C.sitResult);
     check('a visitor can sit at the owner\'s desk', sitReply[0]?.ok === true && (await until(() => bPlayer.snapshot()?.seatId === seat.id)), `${JSON.stringify(sitReply[0])} at ${bPlayer.x},${bPlayer.y} seat ${seat.id} tile ${seat.tx},${seat.ty} map ${bPlayer.map} snap ${bPlayer.snapshot()?.seatId}`);
@@ -474,7 +491,7 @@ async function main(): Promise<void> {
     const ownerSit = await ask<{ ok: boolean; reason?: string }>(a1, () => a1.room.send(C2S.sit, { seatId: seat.id }), S2C.sitResult);
     check('a taken seat cannot be taken twice in the same home', ownerSit[0]?.ok === false && ownerSit[0]?.reason === 'taken');
     const cOwn = await enterHome(cPlayer, cInfo.id);
-    const cSeat = homeSeats(homeOf(cPlayer) as unknown as HomeLayout)[0]!;
+    const cSeat = homeSeats(homeOf(cPlayer) as unknown as HomeLayout).find((spot) => spot.kind === 'chair')!;
     await walkNextTo(cPlayer, cSeat.tx, cSeat.ty);
     const cSit = await ask<{ ok: boolean }>(cPlayer, () => cPlayer.room.send(C2S.sit, { seatId: cSeat.id }), S2C.sitResult);
     check('the same seat id in another home is a different seat', cOwn.result?.ok === true && cSeat.id === seat.id && cSit[0]?.ok === true);

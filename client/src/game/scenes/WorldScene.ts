@@ -113,7 +113,7 @@ export class WorldScene extends Phaser.Scene {
   private locked = false;
   private travelling = false;
   private zone: ZoneDef | null = null;
-  private seatWasNear = false;
+  private seatWasNear: SeatDef['kind'] | null = null;
   private remotes!: RemotePlayers;
   private moveSeq = 0;
   private sinceMoveSent = 0;
@@ -134,7 +134,7 @@ export class WorldScene extends Phaser.Scene {
     if (!profile) throw new Error('The world was started before a profile exists');
 
     this.travelling = false;
-    this.seatWasNear = false;
+    this.seatWasNear = null;
     this.editing = false;
     this.insideDoor = null;
     this.homeView = null;
@@ -444,10 +444,10 @@ export class WorldScene extends Phaser.Scene {
     } else {
       this.marker.setVisible(false);
     }
-    const near = seat !== null;
+    const near = seat?.kind ?? null;
     if (near !== this.seatWasNear) {
       this.seatWasNear = near;
-      bus.emit('seat:near', { available: near });
+      bus.emit('seat:near', { available: near !== null, bed: near === 'bed' });
     }
   }
 

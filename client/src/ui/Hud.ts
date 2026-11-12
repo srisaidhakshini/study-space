@@ -129,6 +129,7 @@ export function createHud(actions: HudActions): HTMLElement {
   });
 
   let seatNear = false;
+  let bedNear = false;
   let confirmingStand = false;
 
   const renderToday = (): void => {
@@ -182,9 +183,14 @@ export function createHud(actions: HudActions): HTMLElement {
       setChildren(
         dock,
         seatNear
-          ? button('Sit here', 'btn btn-primary btn-big', () => bus.emit('ui:sit'))
+          ? button(bedNear ? 'Sleep here' : 'Sit here', 'btn btn-primary btn-big', () => bus.emit('ui:sit'))
           : button('Sit down to start a timer', 'btn btn-big', () => undefined, { disabled: true }),
       );
+      return;
+    }
+
+    if (app.timer.sleeping) {
+      setChildren(dock, h('span', { class: 'chip' }, 'Sleeping'), button('Get up', 'btn btn-small', standUp));
       return;
     }
 
@@ -353,9 +359,10 @@ export function createHud(actions: HudActions): HTMLElement {
     renderHomeControls();
   });
   app.friends.changed.subscribe(renderHomeControls);
-  bus.on('seat:near', ({ available }) => {
-    if (seatNear === available) return;
+  bus.on('seat:near', ({ available, bed = false }) => {
+    if (seatNear === available && bedNear === bed) return;
     seatNear = available;
+    bedNear = bed;
     if (!app.timer.seated) renderDock();
   });
   app.timer.changed.subscribe(() => {

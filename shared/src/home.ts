@@ -225,6 +225,8 @@ export function homeSeats(layout: HomeLayout): SeatDef[] {
   for (const placed of layout.items) {
     const item = getFurniture(placed.itemId);
     if (!item) continue;
+    const { w, h } = footprint(item, placed.rotation);
+    const bedArea = item.category === 'bed' ? { x: placed.x + 1, y: placed.y, width: w, height: h } : undefined;
     item.seats.forEach((spec, index) => {
       const cell = rotateCell(item, spec.dx, spec.dy, placed.rotation);
       seats.push({
@@ -233,7 +235,8 @@ export function homeSeats(layout: HomeLayout): SeatDef[] {
         ty: placed.y + cell.dy,
         facing: rotateFacing(spec.facing, placed.rotation),
         zoneId: 'home',
-        kind: item.category === 'seating' && item.id !== 'armchair' && item.id !== 'beanbag' ? 'bench' : 'chair',
+        ...(bedArea ? { bedArea } : {}),
+        kind: bedArea ? 'bed' : item.category === 'seating' && item.id !== 'armchair' && item.id !== 'beanbag' ? 'bench' : 'chair',
       });
     });
   }
@@ -252,6 +255,8 @@ export function roomIsUsable(layout: HomeLayout): boolean {
   const entry = homeEntryTile(layout);
   if (isBlocked(grid, entry.tx, entry.ty)) return false;
   for (const seat of homeSeats(layout)) {
+    // Beds were decorative in existing layouts. An obstructed bed must not invalidate a room.
+    if (seat.kind === 'bed') continue;
     let reachable = false;
     for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
       const tx = seat.tx + dx;

@@ -12,7 +12,7 @@ export interface BusEvents {
   /** Game -> UI: the player entered a map or crossed into another zone. */
   location: { mapId: string; mapName: string; zone: ZoneDef | null };
   /** Game -> UI: whether a free seat is within reach (shows the sit hint). */
-  'seat:near': { available: boolean };
+  'seat:near': { available: boolean; bed?: boolean };
   /** UI -> Game: sit on the nearest free seat. */
   'ui:sit': undefined;
   /** UI -> Audio: play the timer chime once so the alert volume can be judged. */

@@ -39,6 +39,15 @@ export class Seats {
     return this.byTile.get(`${tx},${ty}`) ?? null;
   }
 
+  get(seatId: string): SeatDef | undefined {
+    return this.current.find((seat) => seat.id === seatId);
+  }
+
+  bedsAt(tx: number, ty: number): SeatDef[] {
+    return this.current.filter(({ bedArea }) => bedArea && tx >= bedArea.x && tx < bedArea.x + bedArea.width
+      && ty >= bedArea.y && ty < bedArea.y + bedArea.height);
+  }
+
   isFree(seatId: string): boolean {
     return !this.occupants.has(seatId);
   }

@@ -16,7 +16,7 @@ export const TILE_PROP_SORT_OFFSET = 'sortOffset';
 export const OBJECT_TYPES = ['seat', 'door', 'spawn', 'zone', 'lamp', 'light'] as const;
 export type MapObjectType = (typeof OBJECT_TYPES)[number];
 
-export const SEAT_KINDS = ['chair', 'bench'] as const;
+export const SEAT_KINDS = ['chair', 'bench', 'bed'] as const;
 export type SeatKind = (typeof SEAT_KINDS)[number];
 
 export interface Rect {
@@ -35,6 +35,8 @@ export interface SeatDef {
   facing: Direction;
   zoneId: string;
   kind: SeatKind;
+  /** Bed footprint in tiles, shared by all its sleeping spots. */
+  bedArea?: Rect;
 }
 
 /** Walking into this rectangle travels to another map. Tiled: rectangle, type "door". */
@@ -202,6 +204,12 @@ const SEAT_OFFSETS: Record<SeatKind, Record<Direction, { dx: number; dy: number 
     left: { dx: -1, dy: -2 },
     right: { dx: 1, dy: -2 },
   },
+  bed: {
+    down: { dx: 0, dy: -13 },
+    up: { dx: 0, dy: -3 },
+    left: { dx: 5, dy: -8 },
+    right: { dx: -5, dy: -8 },
+  },
   bench: {
     down: { dx: 0, dy: -3 },
     up: { dx: 0, dy: -2 },
@@ -212,8 +220,18 @@ const SEAT_OFFSETS: Record<SeatKind, Record<Direction, { dx: number; dy: number 
 
 export function seatFeetPosition(seat: SeatDef): { x: number; y: number } {
   const off = SEAT_OFFSETS[seat.kind][seat.facing];
-  return {
-    x: seat.tx * TILE + TILE / 2 + off.dx,
-    y: (seat.ty + 1) * TILE + off.dy,
-  };
+  let x = seat.tx * TILE + TILE / 2 + off.dx;
+  let y = (seat.ty + 1) * TILE + off.dy;
+  const bed = seat.bedArea;
+  if (bed) {
+    const vertical = seat.facing === 'up' || seat.facing === 'down';
+    if (vertical) {
+      const left = bed.x * TILE;
+      x = bed.width === 2 ? left + TILE : Math.min(Math.max(x, left + 12), left + bed.width * TILE - 12);
+    } else {
+      const top = bed.y * TILE;
+      y = bed.height === 2 ? top + TILE : Math.min(Math.max(y, top + 12), top + bed.height * TILE - 12);
+    }
+  }
+  return { x, y };
 }

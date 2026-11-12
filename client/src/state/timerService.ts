@@ -67,6 +67,8 @@ export class TimerService {
     return this.seat;
   }
 
+  sleeping = false;
+
   get seated(): boolean {
     return this.seat !== null;
   }
@@ -77,9 +79,10 @@ export class TimerService {
   }
 
   /** Called by the game when the player sits down (seat id) or stands (null). */
-  setSeat(seatId: string | null): void {
-    if (this.seat === seatId) return;
+  setSeat(seatId: string | null, sleeping = false): void {
+    if (this.seat === seatId && this.sleeping === sleeping) return;
     this.seat = seatId;
+    this.sleeping = sleeping;
     // Online, the server ends the session when it stands the player up.
     if (seatId === null && !this.online && this.current.phase !== 'idle') {
       this.stop();
@@ -90,7 +93,7 @@ export class TimerService {
 
   /** Starts a session. Returns false when the player is not seated. */
   start(config: TimerConfig): boolean {
-    if (!this.seated) return false;
+    if (!this.seated || this.sleeping) return false;
     this.lastConfig = sanitizeTimerConfig(config);
     saveJson(CONFIG_KEY, this.lastConfig);
     if (this.online) {

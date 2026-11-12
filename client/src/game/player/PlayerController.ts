@@ -136,7 +136,7 @@ export class PlayerController {
     this.sitRequest = null;
     if (!result.ok) {
       const why: Record<string, string> = {
-        taken: 'That seat is taken.',
+        taken: request.seat.kind === 'bed' ? 'That sleeping spot is taken.' : 'That seat is taken.',
         far: 'Walk closer to sit there.',
         seated: 'You are already sitting.',
       };
@@ -167,6 +167,7 @@ export class PlayerController {
     this.seats.vacate(seat.id);
     this.seat = null;
     this.character.cancelOneShot();
+    this.character.setBed(undefined);
     this.character.setAction('idle');
     this.character.setBubble(null);
     if (position) this.character.setPosition(position.x, position.y);
@@ -206,6 +207,15 @@ export class PlayerController {
   moveTo(worldX: number, worldY: number): void {
     if (this.seat && !this.leaveSeatForMovement()) return;
     const target: TilePoint = { x: toTile(worldX), y: toTile(worldY) };
+    const beds = this.seats.bedsAt(target.x, target.y);
+    if (beds.length > 0) {
+      const free = beds.filter((bed) => this.seats.isFree(bed.id));
+      const direct = free.find((bed) => bed.tx === target.x && bed.ty === target.y);
+      const choices = direct ? [direct, ...free.filter((bed) => bed !== direct)] : free;
+      if (choices.some((bed) => this.walkToSeat(bed, false))) return;
+      bus.emit('toast', { text: free.length ? "Can't reach that bed." : 'That bed is full.' });
+      return;
+    }
     const seat = this.seats.at(target.x, target.y);
     if (seat) {
       if (this.seats.isFree(seat.id)) this.walkToSeat(seat);
@@ -276,7 +286,7 @@ export class PlayerController {
     return false;
   }
 
-  private walkToSeat(seat: SeatDef): void {
+  private walkToSeat(seat: SeatDef, showFailure = true): boolean {
     const start = this.currentTile();
     let best: TilePoint[] | null = null;
     for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
@@ -284,8 +294,8 @@ export class PlayerController {
       if (tiles && (!best || tiles.length < best.length)) best = tiles;
     }
     if (!best) {
-      bus.emit('toast', { text: "Can't reach that seat." });
-      return;
+      if (showFailure) bus.emit('toast', { text: "Can't reach that seat." });
+      return false;
     }
     this.pendingSeat = seat;
     if (best.length === 1) {
@@ -294,6 +304,7 @@ export class PlayerController {
     } else {
       this.followTiles(best);
     }
+    return true;
   }
 
   private followTiles(tiles: TilePoint[]): void {
@@ -371,16 +382,22 @@ export class PlayerController {
     const feet = at ?? seatFeetPosition(seat);
     c.cancelOneShot();
     c.setFacing(at?.dir ?? seat.facing);
-    c.setAction('sit');
+    c.setBed(seat.bedArea);
+    c.setAction(seat.kind === 'bed' ? 'sleep' : 'sit');
     c.setPosition(feet.x, feet.y);
     this.lastActivity = Date.now();
     this.lastPhase = 'idle';
-    app.timer.setSeat(seat.id);
+    app.timer.setSeat(seat.id, seat.kind === 'bed');
   }
 
   /** Picks the seated pose, bubble and nameplate text from the timer. */
   private updateSeated(): void {
     const c = this.character;
+    if (this.seat?.kind === 'bed') {
+      c.setAction('sleep');
+      c.statusText = 'Sleeping';
+      return;
+    }
     const now = Date.now();
     const state = app.timer.state;
     if (state.phase !== this.lastPhase) {

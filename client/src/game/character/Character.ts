@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CHAR_H, FX_KEYS, type AnimationName, type Appearance, type Direction } from '@study/shared';
+import { CHAR_H, FX_KEYS, TILE, type AnimationName, type Appearance, type Direction, type Rect } from '@study/shared';
 import { DEPTH } from '../depths';
 import { characterAnimKey, ensureCharacterTexture } from './textures';
 
@@ -7,6 +7,8 @@ import { characterAnimKey, ensureCharacterTexture } from './textures';
 export type CharacterAction = 'idle' | 'walk' | 'sit' | 'study' | 'sleep';
 
 /** Row of the frame where the feet touch the ground (2px of padding below). */
+const BED_ANGLES: Record<Direction, number> = { up: 0, right: 90, down: 180, left: -90 };
+
 const FEET_ROW = CHAR_H - 2;
 const DUST_ANIM = 'fx:dust';
 const DUST_EVERY_MS = 260;
@@ -30,6 +32,7 @@ export class Character {
   private readonly bubble: Phaser.GameObjects.Image;
   private readonly bubbleIcon: Phaser.GameObjects.Image;
   private texture: string;
+  private bedArea: Rect | undefined;
   private action: CharacterAction = 'idle';
   private oneShot: AnimationName | null = null;
   private bubbleFrame: number | null = null;
@@ -89,6 +92,14 @@ export class Character {
     this.play();
   }
 
+  setBed(area: Rect | undefined): void {
+    if (this.bedArea === area) return;
+    this.bedArea = area;
+    if (area) this.cancelOneShot();
+    this.play();
+    this.sync();
+  }
+
   setAction(action: CharacterAction): void {
     if (this.action === action) return;
     this.action = action;
@@ -100,6 +111,7 @@ export class Character {
 
   /** Plays an animation once, then returns to the current action. */
   playOnce(anim: AnimationName): void {
+    if (this.bedArea) return;
     this.oneShot = anim;
     this.play();
   }
@@ -176,14 +188,16 @@ export class Character {
 
   private play(force = false): void {
     const anim = this.oneShot ?? this.action;
-    const key = characterAnimKey(this.texture, anim, this.facing);
+    const key = characterAnimKey(this.texture, anim, this.bedArea ? 'down' : this.facing);
     if (force) this.sprite.setTexture(this.texture);
     this.sprite.play(key, !force);
   }
 
   private sync(): void {
     const seated = this.action === 'sit' || this.action === 'study' || this.action === 'sleep';
-    this.sprite.setPosition(this.x, this.y).setDepth(this.y);
+    const bed = this.bedArea;
+    const depth = bed ? (bed.y + bed.height) * TILE + 0.1 : this.y;
+    this.sprite.setPosition(this.x, this.y).setDepth(depth).setAngle(bed ? BED_ANGLES[this.facing] : 0);
     this.shadow
       .setPosition(this.x, this.y - 1)
       .setDepth(this.y - 0.5)

@@ -210,9 +210,12 @@ export class RemotePlayers {
       }
     }
 
+    const bed = snap.seatId ? this.seats.get(snap.seatId)?.bedArea : undefined;
+    c.setBed(bed);
     const seated = snap.seatId !== '';
     let action: CharacterAction;
-    if (snap.phase === 'focus' && seated) action = 'study';
+    if (bed) action = 'sleep';
+    else if (snap.phase === 'focus' && seated) action = 'study';
     else if (snap.anim === 'walk') action = 'walk';
     else if (snap.anim === 'sleep') action = 'sleep';
     else if (seated || snap.anim === 'sit' || snap.anim === 'study') action = 'sit';
@@ -236,7 +239,7 @@ export class RemotePlayers {
       c.statusText = `On break · ${formatClock(clockMs(state, Date.now()))}${stars}`;
     } else {
       c.setBubble(null);
-      c.statusText = null;
+      c.statusText = bed ? 'Sleeping' : null;
     }
   }
 

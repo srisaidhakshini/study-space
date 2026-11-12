@@ -63,8 +63,9 @@ const desk: PlacedItem = { itemId: 'desk_basic', x: 5, y: 4, rotation: 0 };
 const bed: PlacedItem = { itemId: 'bed_single', x: 8, y: 3, rotation: 0 };
 const layout: HomeLayout = { ...defaultLayout(), items: [desk, bed] };
 check('starter layout is valid', layoutError(layout) === null);
-check('a desk provides one seat facing the desk', homeSeats(layout).length === 1 && homeSeats(layout)[0]!.facing === 'up');
-const seat = homeSeats(layout)[0]!;
+const chairs = homeSeats(layout).filter((seat) => seat.kind === 'chair');
+check('a desk provides one seat facing the desk', chairs.length === 1 && chairs[0]!.facing === 'up');
+const seat = chairs[0]!;
 check('the seat sits on its tile (solid)', isBlocked(homeCollision(layout), seat.tx, seat.ty));
 check('the entry tile is walkable', !isBlocked(homeCollision(layout), homeEntryTile(layout).tx, homeEntryTile(layout).ty));
 
@@ -97,6 +98,14 @@ check('quarter turn moves the seat and the facing', homeSeats(sideways)[0]!.faci
 check('itemCells matches the rotated footprint', itemCells(getFurniture('desk_basic')!, 4, 4, 1).length === 4);
 
 // Map ids and street arithmetic
+for (const rotation of [0, 1, 2, 3]) {
+  for (const [itemId, capacity] of [['bed_single', 1], ['bed_double', 2]] as const) {
+    const spots = homeSeats({ ...layout, items: [{ itemId, x: 3, y: 3, rotation }] });
+    check(`${itemId} holds ${capacity} at rotation ${rotation}`,
+      spots.length === capacity && spots.every((spot) => spot.kind === 'bed') &&
+      new Set(spots.map((spot) => spot.id)).size === capacity);
+  }
+}
 check('house numbers round-trip', slotOf(houseNumber(3, 5)) === 5 && streetPageOf(houseNumber(3, 5)) === 3);
 check('map ids parse', parseMapId(homeMapId('abc')).kind === 'home' && parseMapId('street:4').kind === 'street' && parseMapId('hub').kind === 'place');
 

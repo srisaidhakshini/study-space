@@ -369,7 +369,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       s.restSince = now;
       this.seats.set(key, s.id);
       s.player.seatId = seat.id;
-      s.player.anim = 'sit';
+      s.player.anim = seat.kind === 'bed' ? 'sleep' : 'sit';
       reply({ ok: true, x: feet.x, y: feet.y, dir: seat.facing });
     });
   }
@@ -396,6 +396,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.withSession(client, (s) => {
       const config = parseTimerConfig(raw);
       if (!config || s.seatKey === null || s.timer.phase !== 'idle') return;
+      if (this.mapOf(s).seats.get(s.player.seatId)?.kind === 'bed') return;
       const now = serverConfig.now();
       s.timer = startTimer(config, now);
       writeTimer(s.player, s.timer);
@@ -461,7 +462,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     for (const s of this.sessions.values()) {
       rollDay(s, now);
       this.advance(s, now);
-      const anim = deriveAnim(s, now);
+      const anim = s.seatKey && this.mapOf(s).seats.get(s.player.seatId)?.kind === 'bed' ? 'sleep' : deriveAnim(s, now);
       if (s.player.anim !== anim) s.player.anim = anim;
     }
   }

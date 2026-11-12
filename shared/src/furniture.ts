@@ -82,8 +82,8 @@ export const FURNITURE: readonly FurnitureItem[] = [
   item({ id: 'desk_wide', name: 'Wide desk', category: 'desk', placement: 'floor', w: 3, h: 2, price: 250, seats: [{ dx: 1, dy: 1, facing: 'up' }], blurb: 'Room for books, a lamp and a mug.' }),
   item({ id: 'desk_pair', name: 'Buddy desk', category: 'desk', placement: 'floor', w: 4, h: 2, price: 450, seats: [{ dx: 1, dy: 1, facing: 'up' }, { dx: 2, dy: 1, facing: 'up' }], blurb: 'Two chairs side by side for studying together.' }),
   // Beds
-  item({ id: 'bed_single', name: 'Single bed', category: 'bed', placement: 'floor', w: 2, h: 3, price: 0, starter: 1, blurb: 'Soft pillow, patchwork quilt.' }),
-  item({ id: 'bed_double', name: 'Double bed', category: 'bed', placement: 'floor', w: 3, h: 3, price: 300, blurb: 'Plenty of space for naps.' }),
+  item({ id: 'bed_single', name: 'Single bed', category: 'bed', placement: 'floor', w: 2, h: 3, price: 0, starter: 1, seats: [{ dx: 0, dy: 2, facing: 'up' }], blurb: 'Sleeps one. Soft pillow and a patchwork quilt.' }),
+  item({ id: 'bed_double', name: 'Double bed', category: 'bed', placement: 'floor', w: 3, h: 3, price: 300, seats: [{ dx: 0, dy: 2, facing: 'up' }, { dx: 2, dy: 2, facing: 'up' }], blurb: 'Sleeps two, with room to stretch out.' }),
   // Shelves
   item({ id: 'shelf_low', name: 'Low shelf', category: 'shelf', placement: 'floor', w: 2, h: 1, lift: 1, price: 80, blurb: 'Books and little treasures.' }),
   item({ id: 'shelf_tall', name: 'Tall shelf', category: 'shelf', placement: 'floor', w: 1, h: 1, lift: 2, price: 70, blurb: 'Narrow but tall.' }),
