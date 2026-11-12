@@ -36,6 +36,8 @@ export function openTimerPanel(root: HTMLElement): void {
   const repeat = h('input', { attrs: { type: 'checkbox', id: 'timer-repeat' } });
   repeat.checked = saved.autoRepeat;
   const repeatLabel = h('label', { class: 'check', attrs: { for: 'timer-repeat' } }, repeat, 'Repeat cycles automatically');
+  const syncAvailable = app.net.self()?.map === 'library';
+  const sync = button('Sync with Buddy', 'btn', () => start(true));
 
   const choices: { id: Choice; label: string; note: string }[] = [
     ...TIMER_PRESETS.map((p) => ({ id: p.id, label: p.label, note: 'Pomodoro' })),
@@ -70,6 +72,7 @@ export function openTimerPanel(root: HTMLElement): void {
     const stopwatch = choice === 'stopwatch';
     repeat.disabled = stopwatch;
     repeatLabel.classList.toggle('disabled', stopwatch);
+    sync.disabled = stopwatch;
   };
 
   const buildConfig = (): TimerConfig => {
@@ -84,8 +87,8 @@ export function openTimerPanel(root: HTMLElement): void {
   };
 
   const close = (): void => modal.close();
-  const start = (): void => {
-    const started = app.timer.start(buildConfig());
+  const start = (syncBuddy = false): void => {
+    const started = app.timer.start(buildConfig(), syncBuddy);
     close();
     if (!started) bus.emit('toast', { text: 'Sit down first to start a timer.' });
   };
@@ -98,7 +101,8 @@ export function openTimerPanel(root: HTMLElement): void {
     customRow,
     repeatLabel,
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Subject'), h('div', { class: 'row wrap' }, ...subjectButtons.map((b) => b.el))),
-    h('div', { class: 'panel-actions' }, button('Cancel', 'btn', close), button('Start', 'btn btn-primary', start)),
+    syncAvailable ? h('p', { class: 'hint' }, 'At a Buddy Desk, choose Sync with Buddy on both screens. The first player picks the focus and break lengths.') : null,
+    h('div', { class: 'panel-actions' }, button('Cancel', 'btn', close), syncAvailable ? sync : null, button('Start', 'btn btn-primary', () => start())),
   );
 
   const modal = openModal(root, panel, close);

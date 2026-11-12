@@ -300,9 +300,9 @@ export class NetClient implements NetApi {
   sendStand(): void {
     this.send(C2S.stand);
   }
-  sendTimerStart(config: TimerConfig): void {
-    this.timerSentAt = Date.now();
-    this.send(C2S.timerStart, config);
+  sendTimerStart(config: TimerConfig, syncBuddy = false): void {
+    this.timerSentAt = syncBuddy ? 0 : Date.now();
+    this.send(C2S.timerStart, syncBuddy ? { ...config, syncBuddy } : config);
   }
   sendTimerStop(): void {
     this.send(C2S.timerStop);

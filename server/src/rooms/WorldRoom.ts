@@ -17,6 +17,7 @@ import {
   STUDY_TOGETHER,
   TILE,
   advanceTimer,
+  buddySeat,
   feetBlocked,
   isNameAllowed,
   seatFeetPosition,
@@ -33,6 +34,7 @@ import {
   type SpawnDef,
   type TeleportMessage,
   type TimerEventMessage,
+  type TimerConfig,
   type WelcomeMessage,
 } from '@study/shared';
 import { verifyToken } from '../auth/token';
@@ -69,6 +71,7 @@ export interface CreateOptions {
 
 const EMOTE_COOLDOWN_MS = 1500;
 const MAX_BLOCKED = 200;
+const BUDDY_TIMER_REQUEST_MS = 45_000;
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
@@ -377,6 +380,7 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   /** Gets the player up: ends any timer, frees the seat and, if asked, tells the client where they went. */
   private stand(s: PlayerSession, now: number, notify: boolean): void {
     if (s.seatKey === null) return;
+    this.clearBuddyTimerRequest(s);
     this.endTimer(s, now);
     this.seats.delete(s.seatKey);
     s.seatKey = null;
@@ -398,12 +402,59 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       if (!config || s.seatKey === null || s.timer.phase !== 'idle') return;
       if (this.mapOf(s).seats.get(s.player.seatId)?.kind === 'bed') return;
       const now = serverConfig.now();
-      s.timer = startTimer(config, now);
-      writeTimer(s.player, s.timer);
-      s.player.anim = deriveAnim(s, now);
-      const event: TimerEventMessage = { event: 'focusStart' };
-      s.client.send(S2C.timerEvent, event);
+      if (isPlainObject(raw) && raw.syncBuddy === true) {
+        this.requestBuddyTimer(s, config, now);
+        return;
+      }
+      this.clearBuddyTimerRequest(s);
+      this.beginTimer(s, config, now);
     });
+  }
+
+  private requestBuddyTimer(s: PlayerSession, config: TimerConfig, now: number): void {
+    const notice = (player: PlayerSession, text: string): void => player.client.send(S2C.notice, { text } satisfies NoticeMessage);
+    if (config.mode !== 'pomodoro' || s.player.map !== 'library') {
+      return notice(s, 'Choose a countdown at a Library Buddy Desk to sync timers.');
+    }
+    const map = this.mapOf(s);
+    const seat = map.seats.get(s.player.seatId);
+    const pairedSeat = seat && buddySeat([...map.seats.values()], seat);
+    const peerId = pairedSeat && this.seats.get(`library:${pairedSeat.id}`);
+    const peer = peerId ? this.sessions.get(peerId) : undefined;
+    if (!peer || s.blocked.has(peer.id) || peer.blocked.has(s.id)) {
+      return notice(s, 'Ask someone to sit in the other seat at your Buddy Desk.');
+    }
+    if (peer.timer.phase !== 'idle') return notice(s, 'Wait for your buddy to finish their timer before syncing.');
+
+    const invite = peer.buddyTimerRequest;
+    if (invite?.peerId === s.id && invite.expiresAt > now) {
+      this.clearBuddyTimerRequest(s);
+      this.beginTimer(peer, invite.config, now);
+      this.beginTimer(s, { ...invite.config, subject: config.subject }, now);
+      return;
+    }
+    if (s.buddyTimerRequest?.peerId === peer.id && s.buddyTimerRequest.expiresAt > now) {
+      return notice(s, 'Waiting for your buddy to select Sync with Buddy.');
+    }
+    s.buddyTimerRequest = { peerId: peer.id, config, expiresAt: now + BUDDY_TIMER_REQUEST_MS };
+    notice(s, `Waiting for ${peer.player.name} to select Sync with Buddy within 45 seconds.`);
+    const repeat = config.autoRepeat ? ', repeating' : '';
+    notice(peer, `${s.player.name} invited you to sync (${config.focusMin} min focus, ${config.breakMin} min break${repeat}). Open the timer and select Sync with Buddy within 45 seconds.`);
+  }
+
+  private clearBuddyTimerRequest(s: PlayerSession): void {
+    s.buddyTimerRequest = null;
+    for (const peer of this.sessions.values()) {
+      if (peer.buddyTimerRequest?.peerId === s.id) peer.buddyTimerRequest = null;
+    }
+  }
+
+  private beginTimer(s: PlayerSession, config: TimerConfig, now: number): void {
+    s.timer = startTimer(config, now);
+    writeTimer(s.player, s.timer);
+    s.player.anim = deriveAnim(s, now);
+    const event: TimerEventMessage = { event: 'focusStart' };
+    s.client.send(S2C.timerEvent, event);
   }
 
   private contributeToTree(s: PlayerSession, records: readonly SessionRecord[]): void {
@@ -526,7 +577,12 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.withSession(client, (s) => {
       if (!isPlainObject(raw) || typeof raw.targetId !== 'string' || raw.targetId === s.id) return;
       if (!block) s.blocked.delete(raw.targetId);
-      else if (s.blocked.size < MAX_BLOCKED) s.blocked.add(raw.targetId);
+      else if (s.blocked.size < MAX_BLOCKED) {
+        s.blocked.add(raw.targetId);
+        const target = this.sessions.get(raw.targetId);
+        if (s.buddyTimerRequest?.peerId === raw.targetId) s.buddyTimerRequest = null;
+        if (target?.buddyTimerRequest?.peerId === s.id) target.buddyTimerRequest = null;
+      }
       this.buddies.publishRoster();
       this.boards.send(s);
       const target = this.sessions.get(raw.targetId);

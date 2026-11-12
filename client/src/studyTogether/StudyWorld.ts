@@ -16,14 +16,24 @@ import type { LoadedMap } from '../game/world/mapLoader';
 import type { Seats } from '../game/world/Seats';
 import { focusGhostEnabled, studyDeskStatus } from './preferences';
 
+const BUDDY_BLUE = 0x6eabc2;
+const FOCUS_BUDDY_STAGES = [
+  { minutes: 20, color: 0xffa86f, label: 'Deep focus' },
+  { minutes: 10, color: 0xf0cb77, label: 'Steady focus' },
+  { minutes: 5, color: 0xa5d987, label: 'In rhythm' },
+  { minutes: 0, color: 0x74c7a1, label: '' },
+];
+
 export class StudyWorld {
   private readonly pairBySeat = new Map<string, SeatDef>();
+  private readonly markers = new Map<string, Phaser.GameObjects.Rectangle>();
   private readonly tiles: { image: Phaser.GameObjects.Image; x: number; y: number }[];
   private readonly unsubscribe: () => void;
   private ghost: Character | null = null;
   private focusStart = -1;
   private targetMs = 0;
   private status = '';
+  private activeMarker: Phaser.GameObjects.Rectangle | undefined;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -42,7 +52,9 @@ export class StudyWorld {
       if (seat.tx > partner.tx) continue;
       const x = (seat.tx + 1) * TILE;
       const y = (seat.ty + 0.84) * TILE;
-      scene.add.rectangle(x, y, 11, 2, 0x6eabc2).setDepth(DEPTH.walls + 1);
+      const marker = scene.add.rectangle(x, y, 11, 2, BUDDY_BLUE).setDepth(DEPTH.walls + 1);
+      this.markers.set(seat.id, marker);
+      this.markers.set(partner.id, marker);
     }
   }
 
@@ -53,9 +65,28 @@ export class StudyWorld {
     const occupant = partner && this.seats.occupantOf(partner.id);
     const peer = occupant ? app.net.visiblePeer(occupant) : null;
     const phase = app.timer.state;
-    const buddy = peer
+    let buddy = peer
       ? `Buddy · ${peer.name}${peer.phase === 'focus' ? ' · Focusing' : peer.phase === 'break' ? ' · On break' : ''}`
       : '';
+
+    const now = Date.now();
+    let buddyStage: (typeof FOCUS_BUDDY_STAGES)[number] | undefined;
+    if (phase.phase === 'focus' && peer?.phase === 'focus' && peer.seatId === partner?.id) {
+      const start = Math.max(phase.phaseStartedAt, app.net.toLocalTime(peer.phaseStartedAt));
+      const end = Math.min(phase.phaseEndsAt ?? Infinity, peer.phaseEndsAt > 0 ? app.net.toLocalTime(peer.phaseEndsAt) : Infinity);
+      if (now >= start && now < end) {
+        const elapsed = Math.floor((now - start) / 1000) * 1000;
+        buddyStage = FOCUS_BUDDY_STAGES.find(({ minutes }) => elapsed >= minutes * 60_000);
+        const milestone = buddyStage?.label ? ` · ${buddyStage.label}` : '';
+        buddy = `Focus Buddy · ${peer.name} · ${formatClock(elapsed)}${milestone}`;
+      }
+    }
+    const marker = buddyStage && seat ? this.markers.get(seat) : undefined;
+    if (this.activeMarker !== marker) {
+      this.activeMarker?.setFillStyle(BUDDY_BLUE);
+      this.activeMarker = marker;
+    }
+    if (buddyStage) marker?.setFillStyle(buddyStage.color);
 
     if (phase.phase !== 'focus' || !partner) {
       this.focusStart = -1;
@@ -67,7 +98,7 @@ export class StudyWorld {
       const previous = [...app.sessions.all()].reverse().find((record) => Number.isFinite(record.minutes) && record.minutes > 0);
       this.targetMs = (previous?.minutes ?? 0) * 60_000;
     }
-    const remaining = this.targetMs - Math.max(0, Date.now() - this.focusStart);
+    const remaining = this.targetMs - Math.max(0, now - this.focusStart);
     if (!focusGhostEnabled() || occupant || remaining <= 0) {
       this.setStatus(buddy);
       return this.clearGhost();
@@ -89,6 +120,7 @@ export class StudyWorld {
 
   destroy(): void {
     this.unsubscribe();
+    for (const marker of new Set(this.markers.values())) marker.destroy();
     this.setStatus('');
     this.clearGhost();
   }

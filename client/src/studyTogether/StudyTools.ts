@@ -108,7 +108,8 @@ function libraryTools(): HTMLElement {
   ghost.addEventListener('change', () => setFocusGhost(ghost.checked));
   return h('section', { class: 'study-section' },
     h('h3', {}, 'Buddy desks'),
-    h('p', {}, 'Sit at either seat beside a blue desk marker. If someone takes the paired seat, you can see when they are focusing or on break. Each person runs their own timer.'),
+    h('p', {}, 'Sit in the two seats beside a blue desk marker. To share a countdown, open the timer and choose Sync with Buddy on both screens. The first player picks the focus and break lengths.'),
+    h('p', {}, 'Start focusing together to begin a Focus Buddy. The desk marker changes colour at 5, 10, and 20 minutes. The streak ends when either player stops focusing or leaves the desk.'),
     h('label', { class: 'study-ghost-toggle' }, ghost, 'Show my focus ghost at empty buddy seats'),
     h('p', {}, 'The ghost uses the length of your latest focus session on this device. Only you can see it, and it steps aside when someone takes the seat.'),
   );

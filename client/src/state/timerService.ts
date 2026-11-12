@@ -92,12 +92,12 @@ export class TimerService {
   }
 
   /** Starts a session. Returns false when the player is not seated. */
-  start(config: TimerConfig): boolean {
-    if (!this.seated || this.sleeping) return false;
+  start(config: TimerConfig, syncBuddy = false): boolean {
+    if (!this.seated || this.sleeping || (syncBuddy && !this.online)) return false;
     this.lastConfig = sanitizeTimerConfig(config);
     saveJson(CONFIG_KEY, this.lastConfig);
     if (this.online) {
-      this.net.sendTimerStart(this.lastConfig);
+      this.net.sendTimerStart(this.lastConfig, syncBuddy);
       return true;
     }
     this.current = startTimer(this.lastConfig, Date.now());

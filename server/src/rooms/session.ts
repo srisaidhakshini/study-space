@@ -1,5 +1,5 @@
 import type { Client } from '@colyseus/core';
-import { IDLE_TIMER, MAX_MOVE_DT_MS, MOVE_SPEED, MOVE_SPEED_TOLERANCE, localDayKey, type Direction, type TimerState } from '@study/shared';
+import { IDLE_TIMER, MAX_MOVE_DT_MS, MOVE_SPEED, MOVE_SPEED_TOLERANCE, localDayKey, type Direction, type TimerConfig, type TimerState } from '@study/shared';
 import type { Player } from '../schema/PlayerState';
 
 /** The most movement the server will credit at once, in pixels. */
@@ -14,6 +14,7 @@ export class PlayerSession {
   x = 0;
   y = 0;
   timer: TimerState = { ...IDLE_TIMER };
+  buddyTimerRequest: { peerId: string; config: TimerConfig; expiresAt: number } | null = null;
   /** `${map}:${seatId}` of the seat being used, or null. */
   seatKey: string | null = null;
   /** Where to put the player when they stand up. */
