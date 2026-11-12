@@ -33,11 +33,21 @@ interface Plate {
   chat: ChatBubble | null;
 }
 
+interface PositionedPlate {
+  text: Phaser.GameObjects.Text;
+  chat: ChatBubble | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** World pixels from the feet up to just above the hair. */
 const HEAD_CLEARANCE = 44;
 /** How long a chat line stays above its speaker. */
 const CHAT_SHOW_MS = 5000;
 const CHAT_WRAP_PX = 170;
+const PLATE_GAP = 4;
 
 /**
  * Screen-space labels drawn over the world at native resolution, so text
@@ -46,6 +56,7 @@ const CHAT_WRAP_PX = 170;
 export class OverlayScene extends Phaser.Scene {
   private readonly plates = new Map<NameplateSource, Plate>();
   private readonly labels = new Map<WorldLabel, Phaser.GameObjects.Text | null>();
+  private leaders!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super(SCENES.overlay);
@@ -94,12 +105,14 @@ export class OverlayScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.leaders = this.add.graphics().setDepth(-1);
     // Lay out just before drawing: by then the world camera, which renders
     // first, has settled on this frame's scroll position.
     this.events.on(Phaser.Scenes.Events.PRE_RENDER, this.layout, this);
   }
 
   private layout(): void {
+    this.leaders.clear();
     if ((this.plates.size === 0 && this.labels.size === 0) || !this.scene.isActive(SCENES.world)) return;
     const camera = this.scene.get(SCENES.world).cameras.main;
     const view = camera.worldView;
@@ -115,6 +128,7 @@ export class OverlayScene extends Phaser.Scene {
       const lx = Phaser.Math.Clamp(Math.round((label.x - view.x) * camera.zoom), half, Math.max(half, this.scale.width - half));
       text.setPosition(lx, Math.round((label.y - view.y) * camera.zoom));
     }
+    const positions: PositionedPlate[] = [];
     for (const [source, plate] of this.plates) {
       const text = plate.text ?? this.createText();
       plate.text = text;
@@ -125,18 +139,47 @@ export class OverlayScene extends Phaser.Scene {
       }
       const px = Math.round((source.x - view.x) * camera.zoom);
       const py = Math.round((source.y - HEAD_CLEARANCE - view.y) * camera.zoom);
-      text.setPosition(px, py);
+      if (plate.chat && this.time.now >= plate.chat.until) {
+        plate.chat.text.destroy();
+        plate.chat = null;
+      }
+      const visible = px >= 0 && px <= this.scale.width && py >= 0 && py <= this.scale.height;
+      text.setVisible(visible);
+      plate.chat?.text.setVisible(visible);
+      if (!visible) continue;
 
       const chat = plate.chat;
-      if (chat) {
-        if (this.time.now >= chat.until) {
-          chat.text.destroy();
-          plate.chat = null;
-        } else {
-          // Sits on top of the nameplate, fading out over the last second.
-          chat.text.setPosition(px, py - text.height - 4);
-          chat.text.setAlpha(Math.min(1, (chat.until - this.time.now) / 1000));
-        }
+      const width = Math.max(text.width, chat?.text.width ?? 0);
+      const height = text.height + (chat ? chat.text.height + PLATE_GAP : 0);
+      const half = width / 2 + PLATE_GAP;
+      const x = Phaser.Math.Clamp(px, half, Math.max(half, this.scale.width - half));
+      positions.push({ text, chat, x, y: py, width, height });
+    }
+
+    // Place lower avatars first so their text can stay close to them.
+    positions.sort((a, b) => b.y - a.y || a.x - b.x);
+    this.leaders.lineStyle(1, 0xfbf5ea, 0.65);
+    const placed: PositionedPlate[] = [];
+    for (const plate of positions) {
+      const anchorY = plate.y;
+      // A move can bring the plate into a different one, so recheck the
+      // previously placed rectangles until the whole name and chat fit.
+      let collision: PositionedPlate | undefined;
+      do {
+        collision = placed.find((other) =>
+          Math.abs(plate.x - other.x) < (plate.width + other.width) / 2 + PLATE_GAP &&
+          plate.y > other.y - other.height - PLATE_GAP &&
+          plate.y - plate.height < other.y + PLATE_GAP,
+        );
+        if (collision) plate.y = collision.y - collision.height - PLATE_GAP;
+      } while (collision);
+      placed.push(plate);
+
+      plate.text.setPosition(plate.x, plate.y);
+      if (plate.y < anchorY) this.leaders.lineBetween(plate.x, plate.y, plate.x, anchorY);
+      if (plate.chat) {
+        plate.chat.text.setPosition(plate.x, plate.y - plate.text.height - PLATE_GAP);
+        plate.chat.text.setAlpha(Math.min(1, (plate.chat.until - this.time.now) / 1000));
       }
     }
   }
