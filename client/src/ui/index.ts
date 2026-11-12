@@ -1,5 +1,6 @@
 import './homes.css';
 import { createStudyTools } from '../studyTogether/StudyTools';
+import { openActivityPanel } from './ActivityPanel';
 import { openAccountPanel } from './AccountPanel';
 import { createChat } from './Chat';
 import { openCreator } from './Creator';
@@ -51,6 +52,7 @@ export function mountUi(root: HTMLElement): UiHandle {
     studyTools: createStudyTools(root),
     openAccount: () => openAccountPanel(root),
     openStats: () => openStatsPanel(root),
+    openActivity: () => openActivityPanel(root),
     openCreator: () => openCreator(root),
     openTimerPanel: () => openTimerPanel(root),
     openDrinkMenu: () => openDrinkMenu(root),

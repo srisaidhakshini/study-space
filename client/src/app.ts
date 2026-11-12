@@ -1,6 +1,8 @@
 import type { AssetManifest } from '@study/shared';
 import { createNet } from './net';
+import { tzOffsetMin } from './net/http';
 import { bindHomes } from './net/homesApi';
+import { ActivityTracker } from './state/activity';
 import { AccountStore } from './state/account';
 import { FriendsStore } from './state/friends';
 import { HomeStore } from './state/homes';
@@ -21,6 +23,10 @@ const friends = new FriendsStore(account, net);
  * Shared application state. `manifest` is set by main.ts before anything else
  * runs; `images` starts returning sheets once the game emits 'boot:ready'.
  */
+const timer = new TimerService(sessions, net, () => !account.signedIn);
+const activity = new ActivityTracker(net, timer, tzOffsetMin);
+activity.start();
+
 export const app = {
   manifest: null as unknown as AssetManifest,
   /** Looks up a loaded image or sheet by its manifest key. */
@@ -37,5 +43,7 @@ export const app = {
   friends,
   /** Sound and sky preferences, saved on this device. */
   settings: new SettingsStore(),
-  timer: new TimerService(sessions, net, () => !account.signedIn),
+  timer,
+  /** Time in the app, in calls, studying and with friends (this device). */
+  activity,
 };

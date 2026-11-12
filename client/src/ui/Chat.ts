@@ -9,7 +9,6 @@ const MAX_LINES = 60;
 
 const DENIED: Record<ChatDenyReason, string> = {
   silent: 'Chat is off in the silent zone',
-  focus: 'Chat is off while your focus timer runs',
   cooldown: 'Slow down a little',
   empty: 'Type something first',
   blocked: 'Your message was not delivered',
@@ -43,7 +42,6 @@ export function createChat(): HTMLElement {
 
   const blockReason = (): string | null => {
     if (silent) return DENIED.silent;
-    if (app.timer.state.phase === 'focus') return DENIED.focus;
     return null;
   };
 

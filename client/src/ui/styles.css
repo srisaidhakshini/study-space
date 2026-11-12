@@ -1528,57 +1528,37 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
   max-width: calc(100vw - 20px);
   pointer-events: auto;
 }
 
-.video-dock {
-  --tw: 240px;
-  --th: 180px;
-  --cols: 1;
-}
-
-/* One column of big tiles for a pair or a trio, two columns of smaller ones for more. */
-.video-dock[data-count='2'] {
-  --tw: 320px;
-  --th: 240px;
-}
-.video-dock[data-count='3'] {
-  --tw: 260px;
-  --th: 195px;
-}
-.video-dock[data-count='4'],
-.video-dock[data-count='5'],
-.video-dock[data-count='6'] {
-  --tw: 200px;
-  --th: 150px;
-  --cols: 2;
-}
-.video-dock[data-count='7'],
-.video-dock[data-count='8'] {
-  --tw: 160px;
-  --th: 120px;
-  --cols: 2;
-}
-
-.video-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--cols), var(--tw));
+.video-flow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
-  max-height: calc(100vh - 170px);
-  overflow-y: auto;
+  max-height: calc(100vh - 90px);
+  overflow: auto;
+}
+
+.video-flow[hidden] {
+  display: none;
 }
 
 .video-tile {
   position: relative;
-  width: var(--tw);
-  height: var(--th);
-  max-width: 44vw;
   background: var(--ink);
   border: 3px solid var(--ink);
   border-radius: 6px;
   overflow: hidden;
+  cursor: zoom-in;
+}
+
+/* Tiles in the corner panel are 4:3 at the width you chose (--w). */
+.video-dock .video-tile {
+  width: var(--w, 200px);
+  max-width: calc(100vw - 20px);
+  aspect-ratio: 4 / 3;
 }
 
 .video-feed {
@@ -1601,7 +1581,7 @@ canvas {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 1px 4px;
+  padding: 1px 4px 1px 22px;
   font-size: 11px;
   color: var(--cream);
   background: rgba(0, 0, 0, 0.55);
@@ -1610,9 +1590,96 @@ canvas {
   text-overflow: ellipsis;
 }
 
-.video-controls {
+.video-big-grid .video-name {
+  padding-left: 8px;
+}
+
+/* Bottom-left corner grip: shows on hover (always faintly on touch screens). */
+.video-resize {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nesw-resize;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.video-resize span {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  width: 9px;
+  height: 9px;
+  border-left: 3px solid var(--cream);
+  border-bottom: 3px solid var(--cream);
+}
+
+.video-tile:hover .video-resize,
+.video-resize:active {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .video-resize {
+    opacity: 0.7;
+  }
+}
+
+/* The corner menu: a small button over the panel's top-right corner. */
+.video-menu-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  min-width: 0;
+  padding: 2px 7px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.video-menu-btn:hover {
+  opacity: 1;
+}
+
+.video-menu-btn.video-menu-pill {
+  position: static;
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+.video-menu {
+  position: absolute;
+  top: 36px;
+  right: 6px;
+  z-index: 4;
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  min-width: 160px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 0 4px 0 var(--ink);
+}
+
+.video-menu[hidden] {
+  display: none;
+}
+
+.video-menu-item {
+  padding: 8px 12px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.video-menu-item:hover {
+  background: #f0e2c0;
 }
 
 .video-root {
@@ -1762,10 +1829,6 @@ canvas {
   .dock {
     max-width: calc(100vw - 148px - env(safe-area-inset-left) - env(safe-area-inset-right));
   }
-}
-
-.video-grid[hidden] {
-  display: none;
 }
 
 /* ---------- HUD menu ---------- */

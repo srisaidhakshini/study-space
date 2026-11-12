@@ -21,7 +21,6 @@ function denial(sender: PlayerSession, text: string, resolve: MapLookup, now: nu
   const map = resolve(sender.player.map);
   const zone = map ? zoneAt(map.objects.zones, sender.x, sender.y) : null;
   if (zone?.silent) return 'silent';
-  if (sender.timer.phase === 'focus') return 'focus';
   if (now - sender.lastChatAt < CHAT_COOLDOWN_MS) return 'cooldown';
   return null;
 }

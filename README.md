@@ -143,7 +143,7 @@ friends from the **Friends** button, then visit them from the list. Details in
 - The server owns your position, seat and timer. Your client sends where it
   thinks you are; impossible moves are corrected.
 - Chat reaches nearby players on the same map. It is disabled in silent zones
-  (the library, study benches) and while your own focus timer runs. Emotes are
+  (the library, study benches), but not while your focus timer runs. Emotes are
   always allowed. You can mute, block and report from the People panel.
 
 ## Deploying on one host

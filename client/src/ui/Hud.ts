@@ -11,6 +11,7 @@ export interface HudActions {
   studyTools: HTMLElement;
   openAccount(): void;
   openStats(): void;
+  openActivity(): void;
   openCreator(): void;
   openTimerPanel(): void;
   openServers(): void;
@@ -239,6 +240,7 @@ export function createHud(actions: HudActions): HTMLElement {
     { class: 'hud-menu', attrs: { role: 'menu' } },
     today,
     coins,
+    button('Your time', 'btn btn-small', actions.openActivity, { title: 'Time in the app, in calls, studying and with friends' }),
     homeBtn,
     editHomeBtn,
     friendsBtn,

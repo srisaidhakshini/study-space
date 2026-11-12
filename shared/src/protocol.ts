@@ -298,7 +298,7 @@ export interface ChatMessageOut {
   name: string;
   text: string;
 }
-export type ChatDenyReason = 'silent' | 'focus' | 'cooldown' | 'empty' | 'blocked';
+export type ChatDenyReason = 'silent' | 'cooldown' | 'empty' | 'blocked';
 export interface ChatDeniedMessage {
   reason: ChatDenyReason;
 }
