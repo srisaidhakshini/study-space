@@ -76,6 +76,9 @@ const BUDDY_TIMER_REQUEST_MS = 45_000;
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
 /** One instance of a named server. Every map lives in the same room; players carry a `map` field. */
+/** How long a dropped player's seat is held for a reconnect. */
+const RECONNECT_WINDOW_S = 20;
+
 export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
   private readonly sessions = new Map<string, PlayerSession>();
@@ -216,8 +219,22 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     this.buddies.join(session);
   }
 
-  onLeave(client: Client): void {
+  /** A connection dropped without the player leaving: hold their seat for a short while so the client can reconnect. */
+  async onDrop(client: Client, code?: number): Promise<void> {
     const s = this.sessions.get(client.sessionId);
+    console.log(`[drop] ${s?.player.name ?? client.sessionId} code=${code ?? '?'}`);
+    if (!s) return;
+    try {
+      await this.allowReconnection(client, RECONNECT_WINDOW_S);
+      console.log(`[reconnect] ${s.player.name}`);
+    } catch {
+      // The window passed: onLeave cleans up.
+    }
+  }
+
+  onLeave(client: Client, code?: number): void {
+    const s = this.sessions.get(client.sessionId);
+    console.log(`[leave] ${s?.player.name ?? client.sessionId} code=${code ?? '?'}`);
     if (!s) return;
     this.stand(s, serverConfig.now(), false);
     this.voice.leave(client.sessionId);
