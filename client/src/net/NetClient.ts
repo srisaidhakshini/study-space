@@ -422,9 +422,8 @@ export class NetClient implements NetApi {
   private async attach(room: GameRoom, serverName: string): Promise<void> {
     this.room = room;
     this.leaving = false;
-    // A dropped connection retries for a while; the server holds the seat.
-    room.reconnection.maxRetries = 8;
-    room.reconnection.maxDelay = 3000;
+    // A dropped connection ends the session; the game continues solo.
+    room.reconnection.enabled = false;
 
     const welcome = new Promise<WelcomeMessage>((resolve) => room.onMessage(S2C.welcome, (m: WelcomeMessage) => resolve(m)));
     room.onMessage(BUDDIES.links, (view: BuddyLinks) => {
@@ -466,12 +465,6 @@ export class NetClient implements NetApi {
     room.onMessage(S2C.videoPeerLeft, (m: VoicePeerMessage) => this.video.onPeerLeft(m));
     room.onMessage(S2C.videoSignal, (m: VoiceSignalOut) => this.video.onSignal(m));
     room.onStateChange(() => this.statePatched());
-    room.onDrop((code) => {
-      if (this.room === room && !this.leaving) bus.emit('toast', { text: `Connection dropped (${code}). Reconnecting…` });
-    });
-    room.onReconnect(() => {
-      if (this.room === room) bus.emit('toast', { text: 'Reconnected.' });
-    });
     room.onLeave((code, reason) => this.roomLeft(room, code, reason));
     room.onError((code, message) => console.warn(`Room error ${code}: ${message ?? ''}`));
 

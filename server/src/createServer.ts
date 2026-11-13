@@ -39,7 +39,7 @@ export function createServer(settings: ServerSettings = {}): GameServer {
   getWorld(); // fail fast, with a readable message, if the assets are missing
 
   const server = new Server({
-    transport: new WebSocketTransport({ maxPayload: SIGNAL_MAX_PAYLOAD, pingInterval: 5000, pingMaxRetries: 5 }),
+    transport: new WebSocketTransport({ maxPayload: SIGNAL_MAX_PAYLOAD }),
     gracefullyShutdown: false,
     greet: false,
     express: (app) => {
