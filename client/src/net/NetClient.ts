@@ -87,6 +87,9 @@ function describe(error: unknown): string {
  * HTML interface uses (NetApi) plus the lower-level hooks the game needs:
  * typed senders, message emitters and read access to the synced players.
  */
+/** How often the client pings the server, so an idle or background tab stays connected. */
+const KEEP_ALIVE_MS = 15_000;
+
 export class NetClient implements NetApi {
   readonly changed = new Emitter();
   readonly buddiesChanged = new Emitter();
@@ -119,6 +122,7 @@ export class NetClient implements NetApi {
 
   private room: GameRoom | null = null;
   private leaving = false;
+  private keepAlive: number | null = null;
   private readonly muted = new Set<string>();
   private readonly blocked = new Set<string>();
   private roster = '';
@@ -402,6 +406,8 @@ export class NetClient implements NetApi {
   }
 
   private dropRoom(): void {
+    if (this.keepAlive !== null) window.clearInterval(this.keepAlive);
+    this.keepAlive = null;
     const room = this.room;
     this.room = null;
     this.welcome = null;
@@ -422,8 +428,9 @@ export class NetClient implements NetApi {
   private async attach(room: GameRoom, serverName: string): Promise<void> {
     this.room = room;
     this.leaving = false;
-    // A dropped connection ends the session; the game continues solo.
-    room.reconnection.enabled = false;
+    // A dropped connection retries for a while; the server holds the seat.
+    room.reconnection.maxRetries = 8;
+    room.reconnection.maxDelay = 3000;
 
     const welcome = new Promise<WelcomeMessage>((resolve) => room.onMessage(S2C.welcome, (m: WelcomeMessage) => resolve(m)));
     room.onMessage(BUDDIES.links, (view: BuddyLinks) => {
@@ -465,7 +472,18 @@ export class NetClient implements NetApi {
     room.onMessage(S2C.videoPeerLeft, (m: VoicePeerMessage) => this.video.onPeerLeft(m));
     room.onMessage(S2C.videoSignal, (m: VoiceSignalOut) => this.video.onSignal(m));
     room.onStateChange(() => this.statePatched());
+    room.onDrop((code) => {
+      if (this.room === room && !this.leaving) bus.emit('toast', { text: `Connection dropped (${code}). Reconnecting…` });
+    });
+    room.onReconnect(() => {
+      if (this.room === room) bus.emit('toast', { text: 'Reconnected.' });
+    });
     room.onLeave((code, reason) => this.roomLeft(room, code, reason));
+    // A tab left in the background sends nothing else; a steady ping keeps the link alive through idle timeouts.
+    if (this.keepAlive !== null) window.clearInterval(this.keepAlive);
+    this.keepAlive = window.setInterval(() => {
+      if (this.room === room) room.ping(() => undefined);
+    }, KEEP_ALIVE_MS);
     room.onError((code, message) => console.warn(`Room error ${code}: ${message ?? ''}`));
 
     const greeting = await Promise.race([
