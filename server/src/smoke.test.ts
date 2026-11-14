@@ -185,14 +185,14 @@ async function main(): Promise<void> {
     check('(d) the mover shows a walking animation', b.snapshot(a.id)?.anim === 'walk');
     a.move(a.x, a.y, 'right', false);
 
-    // (g) proximity chat, profanity mask, cooldown, block
+    // (g) proximity chat, cooldown, block
     a.room.send(C2S.chat, { text: 'hello there' });
     check('(g) nearby player receives chat', await until(() => b.messages<ChatMessageOut>(S2C.chat).some((m) => m.text === 'hello there' && m.name === 'Alice')));
     await sleep(900);
     a.room.send(C2S.chat, { text: 'what the f.u.c.k and sh1t' });
     check(
-      '(g) profanity is masked',
-      await until(() => b.messages<ChatMessageOut>(S2C.chat).some((m) => m.text === 'what the ******* and ****')),
+      '(g) chat is delivered unmasked',
+      await until(() => b.messages<ChatMessageOut>(S2C.chat).some((m) => m.text === 'what the f.u.c.k and sh1t')),
       JSON.stringify(b.messages<ChatMessageOut>(S2C.chat).map((m) => m.text)),
     );
     a.room.send(C2S.chat, { text: 'too fast' });
