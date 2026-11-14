@@ -1,7 +1,10 @@
 # Study Space
 
-A cozy pixel-art world for studying together: walk around as a chibi
-character, sit at a desk, and run a focus timer that floats above your head.
+A cozy pixel-art world for studying together. Pick a spot, grab a seat, and
+start a focus timer that floats above your avatar. Bring a friend for a Library
+Buddy Desk, or take a break at the café.
+
+![A pixel-art cat and shiba pace around a Buddy Desk as the lights twinkle](docs/study-space.gif)
 
 **Status: phases 1–6 of 7, plus voice and video; phase 7 (polish) is under way, starting with a touch joystick on phones and tablets.** Study Space has multiplayer, nine public maps, accounts and focus stats, player homes with a furniture shop, and room-wide WebRTC calls. Phase 6 adds the shared Garden tree, Library buddy desks, private buddy trees, player local times, the focus ghost, and subject question boards. See [Phase 6 features](docs/PHASE6.md).
 
@@ -60,6 +63,14 @@ Map ids: `hub`, `library`, `cafe`, `kitchen`, `garden`, `riverside`,
 | Portal Room | South-east building | Two portals to other worlds |
 | Sky Island | Left portal | Floating study deck above the clouds |
 | Glass Dome | Right portal | Underwater study pods |
+
+## Campus rumors
+
+*Fictional lore from the students of Study Space.*
+
+- The library cat earned a degree by sitting on an open textbook for an entire semester.
+- The café claims its espresso can add a twenty-fifth hour to the day. The clock disagrees.
+- The Glass Dome was built after the fish asked for a quiet study floor.
 
 ## Controls
 
