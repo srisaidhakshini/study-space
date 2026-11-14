@@ -6,6 +6,11 @@ import { button, h, setChildren } from './dom';
 import { getNet, watchNet } from './netAccess';
 
 const MAX_LINES = 60;
+const MIN_W = 220;
+const MAX_W = 640;
+const MIN_H = 80;
+const MAX_H = 520;
+const SIZE_KEY = 'study-space.chat-size';
 
 const DENIED: Record<ChatDenyReason, string> = {
   silent: 'Chat is off in the silent zone',
@@ -31,14 +36,68 @@ export function createChat(): HTMLElement {
   const title = h('span', { class: 'chat-title' });
   const toggle = button('', 'btn btn-small btn-icon chat-toggle', () => setCollapsed(!collapsed));
 
+  // Drag the top-right corner to resize: the chat is anchored bottom-left, so it grows up and to the right.
+  const grip = h('div', { class: 'chat-resize', attrs: { title: 'Drag to resize', 'aria-hidden': 'true' } }, h('span'));
+
   const root = h(
     'section',
     { class: 'chat', attrs: { 'aria-label': 'Chat' } },
+    grip,
     h('div', { class: 'chat-head' }, title, toggle),
     log,
     h('div', { class: 'chat-form' }, input, send),
   );
   root.hidden = true;
+
+  const applySize = (w: number, hgt: number): void => {
+    root.style.setProperty('--chat-w', `${w}px`);
+    root.style.setProperty('--chat-h', `${hgt}px`);
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIZE_KEY) ?? 'null') as { w?: number; h?: number } | null;
+    if (saved && typeof saved.w === 'number' && typeof saved.h === 'number') applySize(saved.w, saved.h);
+  } catch {
+    // No saved size: the default applies.
+  }
+
+  grip.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    grip.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startW = root.getBoundingClientRect().width;
+    const startH = log.getBoundingClientRect().height;
+    let size = { w: startW, h: startH };
+    const move = (e: PointerEvent): void => {
+      const w = Math.round(Math.min(MAX_W, window.innerWidth - 20, Math.max(MIN_W, startW + (e.clientX - startX))));
+      const hgt = Math.round(Math.min(MAX_H, window.innerHeight - 200, Math.max(MIN_H, startH + (startY - e.clientY))));
+      size = { w, h: hgt };
+      applySize(w, hgt);
+    };
+    const end = (): void => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', end);
+      grip.removeEventListener('pointercancel', end);
+      try {
+        localStorage.setItem(SIZE_KEY, JSON.stringify(size));
+      } catch {
+        // Not saved; it still applies for this visit.
+      }
+      log.scrollTop = log.scrollHeight;
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+  });
+  grip.addEventListener('dblclick', () => {
+    root.style.removeProperty('--chat-w');
+    root.style.removeProperty('--chat-h');
+    try {
+      localStorage.removeItem(SIZE_KEY);
+    } catch {
+      // Nothing saved to clear.
+    }
+  });
 
   const blockReason = (): string | null => {
     if (silent) return DENIED.silent;
