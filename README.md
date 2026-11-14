@@ -26,7 +26,9 @@ Bring a friend to a Library Buddy Desk, or take a break at the café.
 
 ## Focus timer: the heart of Study Space
 
-<p align="center"><img src="docs/images/timer.svg" alt="Focus timer floating above a seated avatar" width="100%"></p>
+<p align="center"><img src="docs/images/timer.gif" alt="A student sits at a library desk, starts a focus timer, earns a coin, then takes a break" width="100%"></p>
+
+*How a session runs in the game: sit, start, study while the timer floats above you, earn coins, then break.*
 
 Sit at any desk, bench or café table and press **Start timer**. A countdown
 floats above your avatar, so everyone in the room can see you are focusing.
