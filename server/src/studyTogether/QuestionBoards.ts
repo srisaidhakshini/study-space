@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import {
-  filterProfanity,
   hasQuestionBoard,
   QUESTION_LIMIT,
   STUDY_TOGETHER,
@@ -159,7 +158,7 @@ export class QuestionBoards {
       authorId: session.id,
       owner: ownerOf(session),
       author: session.player.name,
-      text: filterProfanity(text).text,
+      text,
     };
   }
 }

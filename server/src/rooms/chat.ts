@@ -3,7 +3,6 @@ import {
   CHAT_MAX_LENGTH,
   CHAT_RADIUS,
   S2C,
-  filterProfanity,
   zoneAt,
   type ChatDenyReason,
   type ChatMessageOut,
@@ -45,7 +44,7 @@ export function sendChat(
   const message: ChatMessageOut = {
     fromId: sender.id,
     name: sender.player.name,
-    text: filterProfanity(cleaned).text,
+    text: cleaned,
   };
   sender.client.send(S2C.chat, message);
 
