@@ -85,10 +85,9 @@ export class AudioManager {
     });
     app.timer.changed.subscribe(() => this.applyVolumes(false));
     app.timer.events.subscribe((event) => {
-      if (event === 'focusDone') this.chime([659.25, 783.99, 1046.5]); // rising: time for a break
-      else if (event === 'breakDone') this.chime([783.99, 587.33]); // falling: back to work
+      if (event === 'focusDone' || event === 'breakDone') this.playBuzzer();
     });
-    bus.on('ui:alertPreview', () => this.chime([659.25, 783.99, 1046.5]));
+    bus.on('ui:alertPreview', () => this.playBuzzer());
     window.setInterval(() => this.updateRain(), WEATHER_CHECK_MS);
     document.addEventListener('visibilitychange', () => this.onVisibility());
     window.addEventListener('keydown', (event) => this.onKey(event));
@@ -238,36 +237,6 @@ export class AudioManager {
 
   // ---- Volumes and rain -------------------------------------------------------------
 
-  /**
-   * Plays a short bell arpeggio at the alert volume, through the master bus
-   * (so muting silences it). It wakes the audio context so a chime still
-   * sounds when the tab is in the background.
-   */
-  private chime(notes: number[]): void {
-    const ctx = this.ctx;
-    const volume = app.settings.get().alerts;
-    if (!ctx || !this.unlocked || volume <= 0) return;
-    void ctx.resume().catch(() => undefined).then(() => {
-      const start = ctx.currentTime + 0.05;
-      notes.forEach((freq, i) => {
-        const at = start + i * 0.22;
-        for (const [mult, level] of [[1, 1], [2.01, 0.3]] as const) {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = freq * mult;
-          const peak = 0.35 * volume * level;
-          gain.gain.setValueAtTime(0.0001, at);
-          gain.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0001), at + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.0001, at + 1.1);
-          osc.connect(gain).connect(this.master);
-          osc.start(at);
-          osc.stop(at + 1.2);
-        }
-      });
-    });
-  }
-
   private focusing(): boolean {
     return app.timer.state.phase === 'focus';
   }
@@ -318,6 +287,49 @@ export class AudioManager {
     const now = ctx.currentTime;
     loop.gain.gain.setValueAtTime(0, now);
     loop.gain.gain.linearRampToValueAtTime(1, now + RAIN_FADE_SECONDS);
+  }
+
+  // ---- Timer buzzer -------------------------------------------------------------------
+
+  /** Three short buzzes (a square + saw pair near 440 Hz) when a timer phase ends. Goes straight to master, so mute still silences it. */
+  private playBuzzer(): void {
+    const ctx = this.ctx;
+    const volume = app.settings.get().alerts;
+    if (!ctx || !this.unlocked || volume <= 0) return;
+    // Wake the context first so the buzzer still sounds when the tab is in the background.
+    void ctx.resume().catch(() => undefined).then(() => this.buzz(ctx, volume));
+  }
+
+  private buzz(ctx: AudioContext, volume: number): void {
+    const start = ctx.currentTime + 0.05;
+    const out = ctx.createGain();
+    out.gain.value = 0.35 * volume;
+    const tone = ctx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 2400;
+    tone.connect(out);
+    out.connect(this.master);
+    for (let i = 0; i < 3; i++) {
+      const at = start + i * 0.42;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, at);
+      env.gain.linearRampToValueAtTime(1, at + 0.01);
+      env.gain.setValueAtTime(1, at + 0.28);
+      env.gain.linearRampToValueAtTime(0, at + 0.32);
+      env.connect(tone);
+      for (const [type, freq] of [['square', 440], ['sawtooth', 442]] as const) {
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = freq;
+        const level = ctx.createGain();
+        level.gain.value = 0.5;
+        osc.connect(level);
+        level.connect(env);
+        osc.start(at);
+        osc.stop(at + 0.34);
+      }
+    }
+    window.setTimeout(() => out.disconnect(), 1800);
   }
 
   // ---- Keyboard ----------------------------------------------------------------------
