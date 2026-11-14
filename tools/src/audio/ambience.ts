@@ -145,22 +145,42 @@ function murmurVoice(rng: Rng): Buf {
 
 // ---- Places ------------------------------------------------------------------
 
-/** Soft wind, distant birds and a faint leaf rustle. */
-export function renderTown(): Buf {
-  const rng = makeRng(101);
-  const wind = mul(band(rng, 'lp', 420, 0.7), sum(gain(lfo(N, 3), 0.5), gain(smoothRandom(rng, N, 0.4), 0.5)));
-  const whoosh = mul(band(rng, 'bp', 1100, 0.6), gain(smoothRandom(rng, N, 0.3), 0.5));
-  const rustle = mul(band(rng, 'bp', 4200, 1.2), gain(smoothRandom(rng, N, 1.6), 0.25));
-  const birds = zeros(N);
-  scatter(birds, rng, 6, () => birdPhrase(rng, pick(rng, [2600, 3200, 3900])), () => range(rng, 0.1, 0.22));
-  return finish(sum(gain(wind, 1.0), gain(whoosh, 0.35), gain(rustle, 0.25), distant(birds)), -24);
+/**
+ * Leaves shaking: hundreds of tiny, soft, crinkly ticks (not continuous noise).
+ * `gusts` (0..1) controls where the rustling swells and where it nearly stops.
+ */
+function leafRustle(rng: Rng, gusts: Buf, count: number, level: number): Buf {
+  const out = zeros(N);
+  for (let i = 0; i < count; i++) {
+    const at = Math.floor(rng() * N);
+    // Thin the grains out in the lulls so the rustle comes and goes with the breeze.
+    if (rng() > gusts[at]! ** 1.6) continue;
+    const len = samples(range(rng, 0.006, 0.02));
+    const grain = mul(biquad(whiteNoise(rng, len), 'bp', range(rng, 2200, 5200), 1.4), decayEnv(len, range(rng, 0.006, 0.016)));
+    addWrap(out, grain, at, range(rng, 0.3, 1) * level);
+  }
+  return circular(out, (d) => lowpass(d, 6500));
 }
 
-/** Very quiet room tone, a slow clock, page rustles and a soft hush. */
+/** A mild breeze: low, slow, smooth swells with no hiss. */
+function softBreeze(rng: Rng): Buf {
+  const swell = sum(gain(lfo(N, 2), 0.4), gain(smoothRandom(rng, N, 0.25), 0.6));
+  return mul(band(rng, 'lp', 300, 0.6), swell.map((v) => 0.25 + 0.75 * v) as Buf);
+}
+
+/** Mild breeze, leaves shaking and birds chirping in the distance. */
+export function renderTown(): Buf {
+  const rng = makeRng(101);
+  const gusts = smoothRandom(rng, N, 0.3);
+  const leaves = leafRustle(rng, gusts, 1400, 0.5);
+  const birds = zeros(N);
+  scatter(birds, rng, 5, () => birdPhrase(rng, pick(rng, [2600, 3200, 3900])), () => range(rng, 0.1, 0.2));
+  return finish(sum(gain(softBreeze(rng), 0.9), gain(leaves, 0.6), gain(distant(birds, 0.45), 0.8)), -27);
+}
+
+/** Near silence: only a slow, quiet clock and the odd page turn. No room noise. */
 export function renderLibrary(): Buf {
   const rng = makeRng(202);
-  const tone = sum(gain(band(rng, 'lp', 220, 0.7), 1), gain(band(rng, 'bp', 700, 0.7), 0.12));
-  const hush = mul(band(rng, 'bp', 1300, 0.5), gain(smoothRandom(rng, N, 0.25), 0.12));
   const ticks = zeros(N);
   for (let s = 0; s < SECONDS; s++) {
     const pitch = s % 2 === 0 ? 1700 : 1300;
@@ -182,7 +202,7 @@ export function renderLibrary(): Buf {
     }
     addWrap(pages, grains, at * SR, 0.9);
   }
-  return finish(sum(tone, hush, gain(ticks, 0.5), pages), -31);
+  return finish(sum(gain(ticks, 0.5), pages), -37);
 }
 
 /** Warm murmur of voices, cup clinks and an occasional espresso hiss. */
@@ -239,7 +259,7 @@ export function renderGarden(): Buf {
   const birds = zeros(N);
   scatter(birds, rng, 8, () => birdPhrase(rng, pick(rng, [2400, 2900, 3500, 4200])), () => range(rng, 0.12, 0.25));
   scatter(birds, rng, 3, () => trill(rng, pick(rng, [3000, 3600]), 6 + Math.floor(rng() * 8)), () => range(rng, 0.1, 0.18));
-  const breeze = mul(band(rng, 'bp', 700, 0.5), sum(gain(lfo(N, 2), 0.4), gain(smoothRandom(rng, N, 0.35), 0.6)));
+  const breeze = sum(softBreeze(rng), gain(leafRustle(rng, smoothRandom(rng, N, 0.3), 1000, 0.5), 0.7));
   const crickets = zeros(N);
   for (let g = 0; g < 32; g++) {
     const burst = zeros(samples(0.16));
@@ -266,24 +286,22 @@ function beeBuzz(): Buf {
   return out;
 }
 
-/** Gentle flowing water: modulated noise bands and small bubbles. */
+/** Water flowing over stones (a soft burble, no hiss) with leaves shaking on the bank. */
 export function renderRiver(): Buf {
   const rng = makeRng(606);
-  const bands: [number, number, number][] = [
-    [380, 0.5, 1],
-    [900, 0.7, 0.7],
-    [1900, 0.8, 0.5],
-    [3600, 1.0, 0.3],
-  ];
-  const flow = sum(
-    ...bands.map(([freq, q, level], i) => mul(band(rng, 'bp', freq, q), gain(smoothRandom(rng, N, 0.9 + i * 0.7), 0.7)).map((v) => v * level) as Buf),
-  );
-  const bubbles = zeros(N);
-  for (let i = 0; i < 160; i++) {
-    const f = range(rng, 700, 2300);
-    addWrap(bubbles, glide(f, f * range(rng, 1.4, 2.2), range(rng, 0.02, 0.05), 'decay'), rng() * N, range(rng, 0.05, 0.2));
+  // A gentle low body of moving water, rolled off so it never hisses.
+  const body = mul(band(rng, 'lp', 700, 0.5), sum(gain(smoothRandom(rng, N, 0.8), 0.5), gain(lfo(N, 4), 0.2)).map((v) => 0.4 + v) as Buf);
+  const ripple = mul(band(rng, 'bp', 1500, 0.9), gain(smoothRandom(rng, N, 2.2), 0.5));
+  // Lots of small rising droplet "glugs" are what make it read as flowing water.
+  const burble = zeros(N);
+  for (let i = 0; i < 520; i++) {
+    const f = range(rng, 400, 1800);
+    addWrap(burble, glide(f, f * range(rng, 1.3, 2.2), range(rng, 0.02, 0.06), 'decay'), rng() * N, range(rng, 0.1, 0.4));
   }
-  return finish(sum(flow, bubbles, gain(band(rng, 'lp', 160, 0.7), 0.4)), -24);
+  const gusts = smoothRandom(rng, N, 0.3);
+  const leaves = leafRustle(rng, gusts, 900, 0.5);
+  const water = circular(sum(gain(body, 0.7), gain(ripple, 0.25), gain(burble, 0.55)), (d) => lowpass(d, 3800));
+  return finish(sum(water, gain(leaves, 0.4)), -26);
 }
 
 /** A soft magical shimmer: a detuned pad with tremolo and sparkling chimes. */

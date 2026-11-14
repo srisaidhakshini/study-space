@@ -162,12 +162,12 @@ the project needs no audio files. Each sound is written to
 
 | Key | Used in | Length |
 | --- | --- | --- |
-| `amb_town` | Town Square (wind, distant birds) | 14 s |
-| `amb_library` | Library (room tone, a slow clock, page rustles) | 14 s |
+| `amb_town` | Town Square (mild breeze, leaves shaking, distant birds) | 14 s |
+| `amb_library` | Library (near silent: a faint clock and page turns) | 14 s |
 | `amb_cafe` | Cafe (voice murmur, cup clinks, espresso hiss) | 14 s |
 | `amb_kitchen` | Common Room (fridge hum, kettle, cupboard tick) | 14 s |
 | `amb_garden` | Garden (birdsong, breeze, crickets, a bee) | 14 s |
-| `amb_river` | Riverside (flowing water, bubbles) | 14 s |
+| `amb_river` | Riverside (flowing water, leaves shaking) | 14 s |
 | `amb_portal` | Portal Room (shimmering pad and chimes) | 14 s |
 | `amb_sky` | Sky Island (high wind, chimes, windmill creak) | 14 s |
 | `amb_dome` | Glass Dome (deep rumble, bubbles, a far whale call) | 14 s |
