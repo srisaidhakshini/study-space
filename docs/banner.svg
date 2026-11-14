@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 260" width="900" height="260">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b1f4b"/><stop offset="1" stop-color="#5b4b8a"/>
+    </linearGradient>
+    <style>
+      .t{font-family:'Courier New',monospace;font-weight:700}
+      .tw{animation:tw 2.4s ease-in-out infinite}
+      @keyframes tw{0%,100%{opacity:.15}50%{opacity:1}}
+      .float{animation:fl 4s ease-in-out infinite}
+      @keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+      .cloud{animation:dr 28s linear infinite}
+      @keyframes dr{from{transform:translateX(-160px)}to{transform:translateX(1060px)}}
+      .ring{stroke-dasharray:157;animation:rg 6s linear infinite;transform-origin:center;transform:rotate(-90deg);transform-box:fill-box}
+      @keyframes rg{from{stroke-dashoffset:157}to{stroke-dashoffset:0}}
+      .type{stroke-dasharray:430;animation:ty 5s steps(36) infinite}
+      @keyframes ty{0%{stroke-dashoffset:430}60%,100%{stroke-dashoffset:0}}
+    </style>
+    <clipPath id="c"><rect width="900" height="260" rx="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#c)">
+    <rect width="900" height="260" fill="url(#sky)"/>
+    <g fill="#fff">
+      <rect class="tw" x="60" y="36" width="4" height="4"/>
+      <rect class="tw" x="190" y="80" width="4" height="4" style="animation-delay:.6s"/>
+      <rect class="tw" x="330" y="30" width="4" height="4" style="animation-delay:1.2s"/>
+      <rect class="tw" x="520" y="64" width="4" height="4" style="animation-delay:.3s"/>
+      <rect class="tw" x="700" y="28" width="4" height="4" style="animation-delay:1.8s"/>
+      <rect class="tw" x="830" y="90" width="4" height="4" style="animation-delay:.9s"/>
+      <rect class="tw" x="610" y="110" width="4" height="4" style="animation-delay:1.5s"/>
+    </g>
+    <g class="cloud" fill="#d9d4f2" opacity=".55"><rect y="60" width="90" height="14" rx="7"/><rect x="20" y="50" width="50" height="14" rx="7"/></g>
+    <g class="cloud" fill="#d9d4f2" opacity=".35" style="animation-delay:-14s"><rect y="120" width="120" height="16" rx="8"/><rect x="30" y="108" width="60" height="16" rx="8"/></g>
+    <rect y="206" width="900" height="54" fill="#2e8b57"/>
+    <rect y="206" width="900" height="6" fill="#3fae6c"/>
+    <g class="float">
+      <text x="450" y="122" text-anchor="middle" class="t" font-size="62" fill="#ffe08a">STUDY SPACE</text>
+    </g>
+    <text x="450" y="166" text-anchor="middle" class="t" font-size="20" fill="#e9e6ff">pick a seat · start a timer · focus together</text>
+    <g transform="translate(792,150)">
+      <circle r="25" fill="none" stroke="#ffffff33" stroke-width="6"/>
+      <circle r="25" fill="none" stroke="#ffe08a" stroke-width="6" stroke-linecap="round" class="ring"/>
+    </g>
+  </g>
+</svg>
