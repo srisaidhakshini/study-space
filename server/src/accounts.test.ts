@@ -269,6 +269,8 @@ async function main(): Promise<void> {
     check('joining again kicks the older connection', await until(() => a.left === JOIN_ERROR.signedInElsewhere), `left=${a.left}`);
     check('the older connection is told why', a.messages<{ text: string }>(S2C.notice).some((n) => n.text.includes('somewhere else')));
     check('the newer connection stays', a2.left === null && a2.snapshot() !== undefined);
+    check('the replacement state does not contain the older character',
+      !(a2.room.state as { players: { has(id: string): boolean } }).players.has(a.id));
 
     // ---- the real timer path saves a session once and pays coins ----------------------------------
     await sitOnBench(a2);

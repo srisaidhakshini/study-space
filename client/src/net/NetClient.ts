@@ -360,8 +360,10 @@ export class NetClient implements NetApi {
   }
 
   private eachPeer(callback: (player: PlayerSnapshot) => void): void {
+    // State patches can arrive before the welcome handshake sets selfId.
+    const selfId = this.room?.sessionId ?? this.selfId;
     this.room?.state?.players?.forEach((player, key) => {
-      if (key !== this.selfId) callback(player);
+      if (key !== selfId) callback(player);
     });
   }
 

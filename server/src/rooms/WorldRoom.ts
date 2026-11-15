@@ -82,6 +82,7 @@ const RECONNECT_WINDOW_S = 600;
 export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
   private readonly sessions = new Map<string, PlayerSession>();
+  private readonly cancelReconnect = new Map<string, () => void>();
   private readonly buddies = new BuddyRoom(this.sessions);
   private readonly boards = new QuestionBoards(this.sessions, () => ({ server: this.serverName, roomId: this.roomId }));
   private lastTreeMinutes = -1;
@@ -227,10 +228,14 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     // 1001: the player closed or refreshed the page on purpose, so there is nothing to come back to.
     if (code === 1001) return;
     try {
-      await this.allowReconnection(client, RECONNECT_WINDOW_S);
+      const reconnect = this.allowReconnection(client, RECONNECT_WINDOW_S);
+      this.cancelReconnect.set(s.id, () => reconnect.reject(false));
+      await reconnect;
       console.log(`[reconnect] ${s.player.name}`);
     } catch {
       // The window passed: onLeave cleans up.
+    } finally {
+      this.cancelReconnect.delete(s.id);
     }
   }
 
@@ -260,6 +265,11 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
       if (old.userId !== userId) continue;
       const notice: NoticeMessage = { text: 'You signed in somewhere else, so this connection was closed.' };
       old.client.send(S2C.notice, notice);
+      // A socket close (or an outstanding reconnect) can take time. Retire
+      // its state now, before publishing the replacement player. onLeave
+      // is idempotent, so the eventual close cannot clean up twice.
+      this.onLeave(old.client, JOIN_ERROR.signedInElsewhere);
+      this.cancelReconnect.get(old.id)?.();
       old.client.leave(JOIN_ERROR.signedInElsewhere, 'Signed in somewhere else');
     }
   }
