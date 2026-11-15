@@ -39,8 +39,8 @@ export function createServer(settings: ServerSettings = {}): GameServer {
   getWorld(); // fail fast, with a readable message, if the assets are missing
 
   const server = new Server({
-    // A background tab can be frozen by the browser and cannot answer pings; waiting 3 minutes (5s x 36) lets it come back instead of being cut off.
-    transport: new WebSocketTransport({ maxPayload: SIGNAL_MAX_PAYLOAD, pingInterval: 5000, pingMaxRetries: 36 }),
+    // A background tab can be frozen by the browser and cannot answer pings; waiting 10 minutes (5s x 120) lets it come back instead of being cut off.
+    transport: new WebSocketTransport({ maxPayload: SIGNAL_MAX_PAYLOAD, pingInterval: 5000, pingMaxRetries: 120 }),
     gracefullyShutdown: false,
     greet: false,
     express: (app) => {

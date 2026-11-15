@@ -77,7 +77,7 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 
 /** One instance of a named server. Every map lives in the same room; players carry a `map` field. */
 /** How long a dropped player's seat is held for a reconnect. */
-const RECONNECT_WINDOW_S = 60;
+const RECONNECT_WINDOW_S = 600;
 
 export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
