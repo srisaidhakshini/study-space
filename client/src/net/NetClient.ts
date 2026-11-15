@@ -429,8 +429,8 @@ export class NetClient implements NetApi {
     this.room = room;
     this.leaving = false;
     // A dropped connection retries for a while; the server holds the seat.
-    room.reconnection.maxRetries = 8;
-    room.reconnection.maxDelay = 3000;
+    room.reconnection.maxRetries = 20;
+    room.reconnection.maxDelay = 4000;
 
     const welcome = new Promise<WelcomeMessage>((resolve) => room.onMessage(S2C.welcome, (m: WelcomeMessage) => resolve(m)));
     room.onMessage(BUDDIES.links, (view: BuddyLinks) => {

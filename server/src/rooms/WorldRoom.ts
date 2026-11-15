@@ -77,7 +77,7 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 
 /** One instance of a named server. Every map lives in the same room; players carry a `map` field. */
 /** How long a dropped player's seat is held for a reconnect. */
-const RECONNECT_WINDOW_S = 20;
+const RECONNECT_WINDOW_S = 60;
 
 export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
   private readonly world = getWorld();
@@ -224,6 +224,8 @@ export class WorldRoom extends Room<{ state: WorldState; metadata: RoomMeta }> {
     const s = this.sessions.get(client.sessionId);
     console.log(`[drop] ${s?.player.name ?? client.sessionId} code=${code ?? '?'}`);
     if (!s) return;
+    // 1001: the player closed or refreshed the page on purpose, so there is nothing to come back to.
+    if (code === 1001) return;
     try {
       await this.allowReconnection(client, RECONNECT_WINDOW_S);
       console.log(`[reconnect] ${s.player.name}`);
